@@ -1,0 +1,22 @@
+<section class="recent-card">
+  <div class="recent-head">
+    <h2>Latest Runs</h2>
+    <a class="button-ghost" href="{{ url_for('home.report_generator_page') }}">View Full Queue</a>
+  </div>
+
+  {% if recent_reports %}
+  <ul class="list">
+    {% for report in recent_reports %}
+    <li class="list-item">
+      <div class="item-meta">
+        <p class="item-title">{{ report.report_type }} | {{ report.start_date }} to {{ report.end_date }}</p>
+        <p class="item-sub">Requested at {{ report.requested_at }}</p>
+      </div>
+      <span class="badge {{ report.status | lower }}">{{ report.status }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">No jobs yet. Start by generating your first report.</p>
+  {% endif %}
+</section>

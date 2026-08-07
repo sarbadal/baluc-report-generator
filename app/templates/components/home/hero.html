@@ -1,0 +1,36 @@
+<section class="hero">
+  <article class="hero-card">
+    <h1>Turn raw EV, Print, and Contact files into action-ready reports.</h1>
+    <p class="hero-sub">
+      This workspace helps your team discover files in GCS, run report jobs in the background, and download clean CSV outputs
+      as soon as each job finishes.
+    </p>
+    <div class="hero-actions">
+      <a class="button-primary" href="{{ url_for('home.report_generator_page') }}">Generate New Report</a>
+      <a class="button-ghost" href="{{ url_for('home.refresh_report_history') }}">Refresh Job Feed</a>
+    </div>
+    <p class="footer-note">Tip: open the generator, submit multiple date windows, and monitor completion in one place.</p>
+  </article>
+
+  <aside class="stats-card">
+    <h2>Recent Job Snapshot</h2>
+    <div class="stats-grid">
+      <div class="stat-row">
+        <span class="stat-label">Tracked Jobs</span>
+        <span class="stat-value">{{ recent_reports|length }}</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Completed</span>
+        <span class="stat-value">{{ completed_count }}</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Generating</span>
+        <span class="stat-value">{{ generating_count }}</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Failed</span>
+        <span class="stat-value">{{ failed_count }}</span>
+      </div>
+    </div>
+  </aside>
+</section>

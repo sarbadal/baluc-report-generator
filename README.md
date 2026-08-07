@@ -1,0 +1,151 @@
+# BaluC Report
+
+Flask-based report workspace for generating and downloading report files, with Google Cloud Storage (GCS) support for report persistence and production static asset delivery.
+
+## Tech Stack
+
+- Python 3.12+
+- Flask 3
+- pandas
+- google-cloud-storage
+
+## Project Structure
+
+- app/: Flask application package
+- app/blueprints/: route handlers
+- app/report_factory/: report generation and async job manager
+- app/services/: GCS-related services and storage repository
+- app/templates/: Jinja templates
+- app/static/: CSS, JS, images, favicon
+- tests/: tests
+- main.py: runtime entrypoint used locally and by deployment
+- deployment.py: Cloud Functions Gen2 deployment helper
+
+## Run Locally
+
+1. Create and activate a virtual environment.
+2. Install dependencies.
+3. Set environment variables in a local env file.
+4. Start the app.
+
+Commands:
+
+	python -m venv .venv
+	source .venv/bin/activate
+	pip install -r requirements.txt
+	python main.py
+
+Default local URL:
+
+- http://127.0.0.1:5001
+
+## Environment Modes
+
+The app reads APP_ENV from environment and maps to config classes:
+
+- development or dev: local development mode
+- production or prod: production mode
+- testing: test mode
+
+Config source: app/config.py
+
+## Static Asset Behavior
+
+In development:
+
+- Static files are served by Flask from app/static.
+
+In production:
+
+- Static URLs are served from GCS.
+- URL format is built from:
+  - STATIC_BUCKET
+  - STATIC_GCS_PREFIX
+  - STATIC_ASSET_BASE_URL (optional explicit override)
+
+If STATIC_ASSET_BASE_URL is empty, the app/deploy flow uses:
+
+- https://storage.googleapis.com/<STATIC_BUCKET>/<STATIC_GCS_PREFIX>
+
+## Required Runtime Variables
+
+Core app/runtime variables:
+
+- APP_ENV
+- SECRET_KEY
+- REPORT_STORAGE_BACKEND
+- REPORT_STORAGE_BUCKET_NAME
+- REPORT_STORAGE_METADATA_OBJECT
+- REPORT_STORAGE_REPORTS_PREFIX
+- REPORT_HISTORY_LIMIT
+- REPORT_RETENTION_DAYS
+- REPORT_STATUS_POLL_SECONDS
+- STATIC_BUCKET
+- STATIC_GCS_PREFIX
+- STATIC_ASSET_BASE_URL
+
+## Deployment (Google Cloud Functions Gen2)
+
+Use deployment.py to:
+
+1. Validate or create bucket
+2. Apply public object-read IAM role for static hosting
+3. Upload app/static to gs://<bucket>/<prefix>
+4. Deploy HTTP Cloud Function with runtime env vars
+
+Important:
+
+- deployment.py expects a KEY=VALUE env file.
+- Do not point deployment.py to an env file that stores raw JSON blocks.
+
+Recommended deployment env file example (deploy.env):
+
+	DEPLOY_PROJECT_ID=your-project-id
+	DEPLOY_REGION=us-central1
+	DEPLOY_FUNCTION_NAME=baluc-report-generator
+	DEPLOY_ENTRY_POINT=entry_point
+	DEPLOY_RUNTIME=python312
+	DEPLOY_BUCKET_NAME=your-static-bucket
+	DEPLOY_BUCKET_LOCATION=US
+	DEPLOY_STATIC_DIR=app/static
+	DEPLOY_SOURCE_DIR=.
+	DEPLOY_STATIC_GCS_PREFIX=static
+	DEPLOY_STATIC_ASSET_BASE_URL=
+	DEPLOY_ALLOW_UNAUTHENTICATED=false
+	APP_ENV=production
+	SECRET_KEY=replace-with-strong-secret
+	REPORT_STORAGE_BACKEND=gcs
+	REPORT_STORAGE_BUCKET_NAME=your-report-storage-bucket
+
+Dry run first:
+
+	python deployment.py --env-file deploy.env --dry-run --dry-run-summary
+
+Deploy:
+
+	python deployment.py --env-file deploy.env
+
+## CLI Options (deployment.py)
+
+Key optional CLI overrides:
+
+- --project-id
+- --region
+- --function-name
+- --entry-point
+- --runtime
+- --bucket-name
+- --bucket-location
+- --static-dir
+- --static-gcs-prefix
+- --static-asset-base-url
+- --source-dir
+- --allow-unauthenticated
+- --dry-run
+- --dry-run-summary
+
+## Notes
+
+- Keep secrets out of source control.
+- Use a strong SECRET_KEY in production.
+- Keep DEPLOY_BUCKET_NAME and STATIC_BUCKET aligned unless you intentionally separate deploy and runtime targets.

@@ -1,0 +1,42 @@
+<article class="card queue">
+  <div class="queue-top">
+    <h2>Recent Reports</h2>
+    <div class="queue-actions">
+      <p id="queue-count">{{ recent_reports|length }} jobs shown</p>
+      <button
+        id="refresh-reports-button"
+        class="refresh-action"
+        type="button"
+        aria-label="Refresh recent reports"
+        data-status-url="{{ url_for('home.report_status') }}?limit={{ recent_reports_limit }}"
+      >
+        <svg class="refresh-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M21 3V9H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M21 12A9 9 0 1 1 18.36 5.64L21 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span>Refresh</span>
+      </button>
+    </div>
+  </div>
+  <p id="refresh-note" class="refresh-note">Manual refresh only.</p>
+
+  <p id="queue-empty" class="empty" {% if recent_reports %}style="display: none"{% endif %}>No report history yet. Submit your first job.</p>
+  <div id="queue-body" class="queue-grid" {% if not recent_reports %}style="display: none"{% endif %}>
+    {% for report in recent_reports %}
+    <div class="job job-row">
+      <p class="job-name">{{ report.report_type }}</p>
+      <p class="job-meta range">{{ report.start_date }} to {{ report.end_date }}</p>
+      <p class="job-meta requested">{{ report.requested_at }}</p>
+      <span class="badge {{ report.status | lower }}">{{ report.status }}</span>
+      {% if report.status == "Completed" %}
+      <a class="download" href="{{ url_for('home.download_report', report_id=report.report_id) }}">CSV</a>
+      {% else %}
+      <span class="job-meta dash">-</span>
+      {% endif %}
+      {% if report.error %}
+      <p class="job-error">{{ report.error }}</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</article>

@@ -1,0 +1,32 @@
+<article class="card composer">
+  <h2>Create a Report Job</h2>
+  <p class="hint">Pick range + type, then submit.</p>
+
+  <form method="post" class="grid">
+    <div class="field field-start">
+      <label for="start_date">Start Date</label>
+      <input id="start_date" name="start_date" type="date" value="{{ form_data.start_date }}" required />
+    </div>
+    <div class="field field-end">
+      <label for="end_date">End Date</label>
+      <input id="end_date" name="end_date" type="date" value="{{ form_data.end_date }}" required />
+    </div>
+    <div class="field field-type">
+      <label for="report_type">Report Type</label>
+      <select id="report_type" name="report_type" required>
+        {% for report_type in report_types %}
+        <option value="{{ report_type }}" {% if report_type == form_data.report_type %}selected{% endif %}>{{ report_type }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="submit-compact">Generate</button>
+  </form>
+
+  {% if submitted_report_id %}
+  <div class="success">Submitted successfully. Tracking ID: {{ submitted_report_id }}</div>
+  {% endif %}
+
+  {% if error %}
+  <div class="error">{{ error }}</div>
+  {% endif %}
+</article>

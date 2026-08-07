@@ -1,0 +1,22 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Report Generator | BaluC{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ static_asset('css/report_generator.css') }}" />
+{% endblock %}
+
+{% block body %}
+<main class="page">
+  {% include "components/reports/header.html" %}
+
+  <section class="layout">
+    {% include "components/reports/job_form.html" %}
+    {% include "components/reports/recent_reports.html" %}
+  </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ static_asset('js/report_generator.js') }}"></script>
+{% endblock %}

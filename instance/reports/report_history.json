@@ -1,0 +1,24 @@
+[
+  {
+    "report_id": "28041b26-0a49-4c6b-88bf-0d4bc1bb4261",
+    "report_type": "EV",
+    "start_date": "2026-07-01",
+    "end_date": "2026-07-03",
+    "requested_at": "2026-08-07T07:21:57Z",
+    "updated_at": "2026-08-07T07:22:11Z",
+    "status": "Completed",
+    "download_filename": "ev_20260701_20260703_28041b26.csv",
+    "error": null
+  },
+  {
+    "report_id": "f27679bc-4882-4d2f-b0ab-5e9507ebba80",
+    "report_type": "EV",
+    "start_date": "2026-07-01",
+    "end_date": "2026-07-09",
+    "requested_at": "2026-08-07T07:18:21Z",
+    "updated_at": "2026-08-07T07:18:53Z",
+    "status": "Completed",
+    "download_filename": "ev_20260701_20260709_f27679bc.csv",
+    "error": null
+  }
+]

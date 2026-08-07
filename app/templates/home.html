@@ -1,0 +1,14 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}BaluC Reports Workspace{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ static_asset('css/home.css') }}" />
+{% endblock %}
+
+{% block body %}
+<main class="page">
+  {% include "components/home/hero.html" %}
+  {% include "components/home/recent_runs.html" %}
+</main>
+{% endblock %}
