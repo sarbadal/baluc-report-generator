@@ -14,7 +14,7 @@ class GCSStorageClientProvider:
 
     def __init__(self, project: str | None = None) -> None:
         """Initialize provider with an optional GCP project override."""
-        self.project = project
+        self.project = (project or "").strip() or self._resolve_project_from_env()
 
     def get_client(self) -> storage.Client:
         """Return a Google Cloud Storage client instance.
@@ -27,10 +27,26 @@ class GCSStorageClientProvider:
             credentials, resolved_project = self._build_credentials_from_env_value(
                 key_source
             )
-            project = self.project or resolved_project
+            project = self.project or (resolved_project or "").strip() or self._resolve_project_from_env()
             return storage.Client(project=project, credentials=credentials)
 
-        return storage.Client(project=self.project)
+        project = self.project or self._resolve_project_from_env()
+        return storage.Client(project=project)
+
+    @staticmethod
+    def _resolve_project_from_env() -> str | None:
+        """Resolve GCP project id from common runtime environment variables."""
+        for env_key in (
+            "GOOGLE_CLOUD_PROJECT",
+            "GCP_PROJECT",
+            "GCLOUD_PROJECT",
+            "PROJECT_ID",
+            "DEPLOY_PROJECT_ID",
+        ):
+            value = os.getenv(env_key, "").strip()
+            if value:
+                return value
+        return None
 
     def _build_credentials_from_env_value(self, key_source: str) -> tuple[service_account.Credentials, str | None]:
         """Build credentials from raw JSON content or a JSON file path."""

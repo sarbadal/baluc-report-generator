@@ -9,7 +9,7 @@ from app import create_app
 app = create_app()
 
 
-def entry_point():
+def entry_point(request):
     """Return the Flask app instance for external runners."""
     return app
 

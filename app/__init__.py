@@ -39,7 +39,13 @@ def create_app(config_object: str | None = None) -> Flask:
     configure_logging(app)
     init_extensions(app)
 
-    provider = GCSStorageClientProvider()
+    provider = GCSStorageClientProvider(
+        project=(
+            os.getenv("GOOGLE_CLOUD_PROJECT", "").strip()
+            or os.getenv("PROJECT_ID", "").strip()
+            or os.getenv("GCP_PROJECT", "").strip()
+        )
+    )
     storage_backend = str(app.config.get("REPORT_STORAGE_BACKEND", "gcs")).strip().lower()
     if storage_backend != "gcs":
         raise ValueError(
