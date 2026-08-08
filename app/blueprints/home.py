@@ -65,8 +65,11 @@ def report_generator_page():
         try:
             bucket_prefix = (
                 current_app.config.get("REPORT_GCS_BUCKET_PREFIX")
-                or os.getenv("TEST_GCS_BUCKET_NAME", "baluc")
+                or current_app.config.get("REPORT_STORAGE_BUCKET_NAME")
+                or os.getenv("TEST_GCS_BUCKET_NAME", "")
             ).strip()
+            if not bucket_prefix:
+                raise ValueError("REPORT_GCS_BUCKET_PREFIX is not configured.")
 
             report_id = report_job_manager.submit_job(
                 bucket_prefix=bucket_prefix,

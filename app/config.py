@@ -26,7 +26,12 @@ class BaseConfig:
 
     TESTING = False
     DEBUG = False
-    REPORT_GCS_BUCKET_PREFIX = os.getenv("REPORT_GCS_BUCKET_PREFIX", "baluc")
+    REPORT_GCS_BUCKET_PREFIX = (
+        os.getenv("REPORT_GCS_BUCKET_PREFIX")
+        or os.getenv("REPORT_STORAGE_BUCKET_NAME")
+        or os.getenv("TEST_GCS_BUCKET_NAME")
+        or "baluc"
+    )
     REPORT_STORAGE_BACKEND = os.getenv("REPORT_STORAGE_BACKEND", "gcs")
     REPORT_STORAGE_BUCKET_NAME = (
         os.getenv("REPORT_STORAGE_BUCKET_NAME")
