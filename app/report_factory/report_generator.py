@@ -90,11 +90,20 @@ class ReportGenerator:
 
     def generate_ev_report(self) -> pd.DataFrame:
         """Generate EV/EB report output for the requested date window."""
-        return self._apply_date_range_if_possible(
-            dataframe=self.dataframe.copy(),
+        source = self.dataframe.copy()
+        filtered = self._apply_date_range_if_possible(
+            dataframe=source,
             start_date=self.start_date,
             end_date=self.end_date,
         )
+
+        # EV files are already date-scoped during discovery; if row-level date
+        # filtering removes everything due to incompatible column formats,
+        # prefer returning discovered data over an empty report.
+        if filtered.empty and not source.empty:
+            return source
+
+        return filtered
 
     def generate_contact_report(self) -> pd.DataFrame:
         """Generate CONTACT report output for the requested date window."""
