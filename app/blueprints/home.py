@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import datetime
 from io import BytesIO
 import os
+from zoneinfo import ZoneInfo
 
 from flask import abort
 from flask import Blueprint
@@ -18,6 +19,7 @@ from flask import url_for
 
 home_blueprint = Blueprint("home", __name__)
 RECENT_REPORTS_LIMIT = 20
+IST_TZ = ZoneInfo("Asia/Kolkata")
 
 
 @home_blueprint.route("/", methods=["GET"])
@@ -41,9 +43,10 @@ def home():
 @home_blueprint.route("/report-generator", methods=["GET", "POST"])
 def report_generator_page():
     """Render report generator workflow with asynchronous status tracking."""
+    today_ist = datetime.now(IST_TZ).date().isoformat()
     form_data = {
-        "start_date": request.form.get("start_date", date.today().isoformat()),
-        "end_date": request.form.get("end_date", date.today().isoformat()),
+        "start_date": request.form.get("start_date", today_ist),
+        "end_date": request.form.get("end_date", today_ist),
     }
     report_job_manager = _get_report_job_manager()
 

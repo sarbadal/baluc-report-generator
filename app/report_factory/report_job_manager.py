@@ -10,6 +10,7 @@ import logging
 import threading
 from time import perf_counter
 import uuid
+from zoneinfo import ZoneInfo
 
 from app.report_factory.report_data_factory import ReportDataFactory
 from app.report_factory.report_generator import ReportGenerator
@@ -19,6 +20,7 @@ from app.services import ReportStorageRepository
 
 
 logger = logging.getLogger(__name__)
+IST_TZ = ZoneInfo("Asia/Kolkata")
 
 
 @dataclass(slots=True)
@@ -276,7 +278,7 @@ class ReportJobManager:
 
     def _apply_retention_unlocked(self, history: list[dict[str, str | None]]) -> tuple[list[dict[str, str | None]], set[str]]:
         """Apply retention and return kept entries plus removed CSV object names."""
-        cutoff = datetime.now() - timedelta(days=self.retention_days)
+        cutoff = datetime.now(IST_TZ) - timedelta(days=self.retention_days)
         kept: list[dict[str, str | None]] = []
         removed_objects: set[str] = set()
 
@@ -321,8 +323,10 @@ class ReportJobManager:
         except ValueError:
             return True
 
-        if created_at.tzinfo is not None:
-            created_at = created_at.astimezone().replace(tzinfo=None)
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=IST_TZ)
+        else:
+            created_at = created_at.astimezone(IST_TZ)
         return created_at >= cutoff
 
     @staticmethod
@@ -330,10 +334,10 @@ class ReportJobManager:
         """Build safe file name for generated CSV artifacts."""
         start = start_date.replace("-", "")
         end = end_date.replace("-", "")
-        report_generation_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_generation_time = datetime.now(IST_TZ).strftime("%Y%m%d_%H%M%S")
         return f"report_{report_generation_time}_{start}_{end}_{report_id[:8]}.csv"
 
     @staticmethod
     def _now_iso() -> str:
-        """Return current local timestamp with timezone in ISO format."""
-        return datetime.now().astimezone().replace(microsecond=0).isoformat()
+        """Return current IST timestamp with timezone in ISO format."""
+        return datetime.now(IST_TZ).replace(microsecond=0).isoformat()

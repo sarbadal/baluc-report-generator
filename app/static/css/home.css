@@ -9,6 +9,17 @@
   --mist: #f1f6fa;
 }
 
+:root[data-theme="dark"] {
+  --ink: #e2edf4;
+  --soft-ink: #afc1d1;
+  --paper: #081924;
+  --panel: #0f2535;
+  --line: #2f4a5f;
+  --accent: #f08a52;
+  --accent-2: #4fb6b7;
+  --mist: #163243;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -22,6 +33,13 @@ body {
     radial-gradient(800px 420px at 8% 0%, #ffd7c4 0%, rgba(255, 215, 196, 0) 64%),
     radial-gradient(740px 460px at 100% 20%, #d2efee 0%, rgba(210, 239, 238, 0) 60%),
     linear-gradient(180deg, #f6fbff 0%, #f9f4ec 58%, #f3f8fd 100%);
+}
+
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(900px 460px at 0% 0%, rgba(47, 74, 95, 0.65), rgba(47, 74, 95, 0) 65%),
+    radial-gradient(760px 420px at 100% 22%, rgba(79, 182, 183, 0.26), rgba(79, 182, 183, 0) 60%),
+    linear-gradient(180deg, #07131c 0%, #0b1f2b 56%, #06121a 100%);
 }
 
 .page {
@@ -120,6 +138,10 @@ h1 {
   background: #f9fcff;
 }
 
+:root[data-theme="dark"] .button-ghost {
+  background: #143247;
+}
+
 .stats-card {
   padding: 10px;
   background:
@@ -213,6 +235,10 @@ h1 {
   justify-content: space-between;
   gap: 8px;
   align-items: center;
+}
+
+:root[data-theme="dark"] .list-item {
+  background: #132d3f;
 }
 
 .item-meta {

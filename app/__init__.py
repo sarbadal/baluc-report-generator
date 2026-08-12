@@ -6,6 +6,7 @@ point and by tests.
 
 from datetime import datetime
 import os
+from zoneinfo import ZoneInfo
 
 from flask import Flask
 from flask import url_for
@@ -17,6 +18,9 @@ from app.extensions import init_extensions
 from app.report_factory import ReportJobManager
 from app.services import GCSReportStorageRepository
 from app.services import GCSStorageClientProvider
+
+
+IST_TZ = ZoneInfo("Asia/Kolkata")
 
 
 def create_app(config_object: str | None = None) -> Flask:
@@ -107,7 +111,7 @@ def create_app(config_object: str | None = None) -> Flask:
     def inject_template_globals() -> dict[str, object]:
         """Expose shared template globals across pages."""
         return {
-            "current_year": datetime.now().year,
+            "current_year": datetime.now(IST_TZ).year,
             "static_asset": static_asset,
         }
 

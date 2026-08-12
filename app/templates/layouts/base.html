@@ -4,6 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block page_title %}BaluC{% endblock %}</title>
+    <script>
+      (function () {
+        var savedTheme = localStorage.getItem("baluc-theme");
+        var preferredDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var theme = savedTheme === "dark" || savedTheme === "light" ? savedTheme : (preferredDark ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
     <link rel="icon" type="image/png" sizes="32x32" href="{{ static_asset('favicon-32x32.png') }}?v=2" />
     <link rel="icon" type="image/png" sizes="16x16" href="{{ static_asset('favicon-16x16.png') }}?v=2" />
     <link rel="icon" type="image/x-icon" href="{{ static_asset('favicon.ico') }}?v=2" />
@@ -16,6 +24,7 @@
     {% include "components/global/header.html" %}
     <div class="app-main">{% block body %}{% endblock %}</div>
     {% include "components/global/footer.html" %}
+    <script src="{{ static_asset('js/theme.js') }}" defer></script>
     {% block scripts %}{% endblock %}
   </body>
 </html>

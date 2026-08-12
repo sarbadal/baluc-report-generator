@@ -9,6 +9,17 @@
   --alert: #9e2715;
 }
 
+:root[data-theme="dark"] {
+  --ink: #e4eef4;
+  --soft: #aabccc;
+  --panel: #102837;
+  --line: #345064;
+  --accent: #3b9ea0;
+  --accent-strong: #2a7e80;
+  --accent-warm: #d6804f;
+  --alert: #ff9f8f;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -22,6 +33,13 @@ body {
     radial-gradient(920px 360px at 100% 0%, rgba(13, 107, 109, 0.18), rgba(13, 107, 109, 0) 64%),
     radial-gradient(760px 300px at 0% 12%, rgba(187, 77, 23, 0.2), rgba(187, 77, 23, 0) 68%),
     linear-gradient(180deg, #f7fcfe 0%, #f8f6f1 100%);
+}
+
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(980px 380px at 100% 0%, rgba(59, 158, 160, 0.28), rgba(59, 158, 160, 0) 62%),
+    radial-gradient(800px 340px at 0% 12%, rgba(214, 128, 79, 0.22), rgba(214, 128, 79, 0) 66%),
+    linear-gradient(180deg, #08161f 0%, #0f2430 100%);
 }
 
 .page {
@@ -187,6 +205,11 @@ button:hover {
   font-size: 12px;
 }
 
+:root[data-theme="dark"] .error {
+  background: rgba(158, 39, 21, 0.2);
+  border-color: rgba(255, 159, 143, 0.55);
+}
+
 .success {
   margin-top: 8px;
   color: #0e613f;
@@ -195,6 +218,12 @@ button:hover {
   border-radius: 8px;
   padding: 8px;
   font-size: 12px;
+}
+
+:root[data-theme="dark"] .success {
+  background: rgba(14, 97, 63, 0.26);
+  border-color: rgba(196, 233, 210, 0.45);
+  color: #d6f0e2;
 }
 
 .queue {
@@ -239,6 +268,10 @@ button:hover {
   display: grid;
   gap: 2px;
   background: #fbfdff;
+}
+
+:root[data-theme="dark"] .job {
+  background: #153042;
 }
 
 .job-row {
