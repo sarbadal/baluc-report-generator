@@ -2,23 +2,68 @@
 
 from __future__ import annotations
 
+import json
 import os
 
 
 GCS_FILE_DISCOVERY_RULES: dict[str, dict[str, str]] = {
     "EV": {
         "folder": "ev",
-        "filename_pattern": r"^ev_dump_(\d{8})\.csv$",
+        "filename_pattern": r"^ev_fact_(\d{8})\.csv$",
     },
     "PRINT": {
         "folder": "print",
-        "filename_pattern": r"^print_dump(\d{8})\.csv$",
+        "filename_pattern": r"^print_fact_(\d{8})\.csv$",
     },
     "CONTACT": {
         "folder": "contact",
-        "filename_pattern": r"^contact_dump_(\d{8})\.csv$",
+        "filename_pattern": r"^contact_fact_(\d{8})\.csv$",
     },
 }
+
+
+def _parse_join_mapping(raw_value: str, default: dict[str, str]) -> dict[str, str]:
+    """Parse comma-separated ``print:ev`` mapping string into a dictionary."""
+    normalized = raw_value.strip()
+    if not normalized:
+        return dict(default)
+
+    mapping: dict[str, str] = {}
+    for pair in normalized.split(","):
+        item = pair.strip()
+        if not item or ":" not in item:
+            continue
+        print_column, ev_column = item.split(":", maxsplit=1)
+        left = print_column.strip()
+        right = ev_column.strip()
+        if left and right:
+            mapping[left] = right
+
+    return mapping or dict(default)
+
+
+def _parse_join_mapping_json(raw_value: str, default: dict[str, str]) -> dict[str, str]:
+    """Parse JSON object mapping of ``print_column -> ev_column``."""
+    normalized = raw_value.strip()
+    if not normalized:
+        return dict(default)
+
+    try:
+        parsed = json.loads(normalized)
+    except json.JSONDecodeError:
+        return dict(default)
+
+    if not isinstance(parsed, dict):
+        return dict(default)
+
+    mapping: dict[str, str] = {}
+    for key, value in parsed.items():
+        left = str(key).strip()
+        right = str(value).strip()
+        if left and right:
+            mapping[left] = right
+
+    return mapping or dict(default)
 
 
 class BaseConfig:
@@ -49,6 +94,38 @@ class BaseConfig:
     REPORT_HISTORY_LIMIT = int(os.getenv("REPORT_HISTORY_LIMIT", "100"))
     REPORT_RETENTION_DAYS = int(os.getenv("REPORT_RETENTION_DAYS", "30"))
     REPORT_STATUS_POLL_SECONDS = int(os.getenv("REPORT_STATUS_POLL_SECONDS", "5"))
+    REPORT_PRINT_KEY_COLUMNS = [
+        column.strip()
+        for column in os.getenv("REPORT_PRINT_KEY_COLUMNS", "pub_name,state,caption").split(",")
+        if column.strip()
+    ]
+    REPORT_PRINT_DATE_COLUMN = os.getenv("REPORT_PRINT_DATE_COLUMN", "finalschdt").strip()
+    _report_print_kpi_column = os.getenv("REPORT_PRINT_KPI_COLUMN", "").strip()
+    REPORT_PRINT_KPI_COLUMN: str | int | float = _report_print_kpi_column if _report_print_kpi_column else 0
+
+    _default_ev_join_mapping = {
+        "pub_name": "pub_name",
+        "state": "state",
+        "caption": "ppl",
+        "finalschdt": "event_date",
+    }
+    _ev_join_mapping_from_json = _parse_join_mapping_json(
+        os.getenv("REPORT_EV_JOIN_MAPPING_JSON", ""),
+        _default_ev_join_mapping,
+    )
+    _ev_join_mapping_from_legacy = _parse_join_mapping(
+        os.getenv("REPORT_EV_JOIN_MAPPING", ""),
+        _default_ev_join_mapping,
+    )
+    REPORT_EV_JOIN_MAPPING = (
+        _ev_join_mapping_from_json
+        if os.getenv("REPORT_EV_JOIN_MAPPING_JSON", "").strip()
+        else _ev_join_mapping_from_legacy
+    )
+    REPORT_EV_DATE_COLUMN = os.getenv("REPORT_EV_DATE_COLUMN", "event_date").strip()
+    REPORT_EV_KPI_COLUMN = os.getenv("REPORT_EV_KPI_COLUMN", "gf_opportunity_created").strip()
+    REPORT_WINDOW_BEFORE = int(os.getenv("REPORT_WINDOW_BEFORE", "2"))
+    REPORT_WINDOW_AFTER = int(os.getenv("REPORT_WINDOW_AFTER", "2"))
 
     ENV_TYPE = "dev"
     STATIC_BUCKET = os.getenv("STATIC_BUCKET", "").strip()

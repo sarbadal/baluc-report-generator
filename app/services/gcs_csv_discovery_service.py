@@ -205,9 +205,18 @@ class GCSCSVDiscoveryService:
     def _get_filename_patterns(file_type: SupportedCSVFileType, primary_pattern: str) -> list[str]:
         """Return ordered filename regex patterns, including known aliases."""
         patterns = [primary_pattern]
+        if file_type == SupportedCSVFileType.EV:
+            patterns.extend(
+                [
+                    r"^ev_fact_(\d{8})\.csv$",
+                    r"^ev_dump_(\d{8})\.csv$",
+                    r"^ev_(\d{8})\.csv$",
+                ]
+            )
         if file_type == SupportedCSVFileType.PRINT:
             patterns.extend(
                 [
+                    r"^print_fact_(\d{8})\.csv$",
                     r"^print_dump_(\d{8})\.csv$",
                     r"^print_(\d{8})\.csv$",
                 ]
@@ -215,6 +224,7 @@ class GCSCSVDiscoveryService:
         if file_type == SupportedCSVFileType.CONTACT:
             patterns.extend(
                 [
+                    r"^contact_fact_(\d{8})\.csv$",
                     r"^contact_dump_(\d{8})\.csv$",
                     r"^contact_(\d{8})\.csv$",
                 ]

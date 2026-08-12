@@ -16,8 +16,6 @@ from flask import request
 from flask import send_file
 from flask import url_for
 
-from app.services import SupportedCSVFileType
-
 home_blueprint = Blueprint("home", __name__)
 RECENT_REPORTS_LIMIT = 20
 
@@ -46,14 +44,11 @@ def report_generator_page():
     form_data = {
         "start_date": request.form.get("start_date", date.today().isoformat()),
         "end_date": request.form.get("end_date", date.today().isoformat()),
-        "report_type": request.form.get("report_type", SupportedCSVFileType.EV.value),
     }
-    report_types = [member.value for member in SupportedCSVFileType]
     report_job_manager = _get_report_job_manager()
 
     context = {
         "form_data": form_data,
-        "report_types": report_types,
         "recent_reports": report_job_manager.list_recent_jobs(limit=RECENT_REPORTS_LIMIT),
         "recent_reports_limit": RECENT_REPORTS_LIMIT,
         "status_poll_seconds": int(current_app.config.get("REPORT_STATUS_POLL_SECONDS", 5)),
@@ -75,7 +70,6 @@ def report_generator_page():
                 bucket_prefix=bucket_prefix,
                 start_date=form_data["start_date"],
                 end_date=form_data["end_date"],
-                report_type=form_data["report_type"],
             )
             context["submitted_report_id"] = report_id
             context["recent_reports"] = report_job_manager.list_recent_jobs(limit=RECENT_REPORTS_LIMIT)

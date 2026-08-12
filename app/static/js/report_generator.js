@@ -32,7 +32,7 @@
 
     return (
       '<div class="job job-row">' +
-      '<p class="job-name">' + esc(report.report_type) + "</p>" +
+      '<p class="job-name">Print Report</p>' +
       '<p class="job-meta range">' + esc(report.start_date) + " to " + esc(report.end_date) + "</p>" +
       '<p class="job-meta requested">' + esc(report.requested_at) + "</p>" +
       '<span class="badge ' + statusClass + '">' + status + "</span>" +

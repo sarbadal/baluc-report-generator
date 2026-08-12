@@ -61,6 +61,21 @@ class GCSCSVDataLoader:
             combined_dataframe=combined_dataframe,
         )
 
+    def load_blob_path(self, blob_path: str, **read_csv_kwargs: Any) -> pd.DataFrame:
+        """Load a single ``gs://`` CSV path and return a DataFrame.
+
+        Raises:
+            ValueError: If the gs path is invalid.
+            FileNotFoundError: If the blob does not exist.
+        """
+        bucket_name, blob_name = self._parse_gs_path(blob_path)
+        blob = self.client.bucket(bucket_name).blob(blob_name)
+        if not blob.exists(self.client):
+            raise FileNotFoundError(f"CSV file was not found at path: {blob_path}")
+
+        csv_bytes = blob.download_as_bytes()
+        return pd.read_csv(BytesIO(csv_bytes), **read_csv_kwargs)
+
     @staticmethod
     def _parse_gs_path(path: str) -> tuple[str, str]:
         """Parse a ``gs://bucket/blob`` path into bucket and blob parts."""

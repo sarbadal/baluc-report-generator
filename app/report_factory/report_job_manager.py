@@ -11,6 +11,7 @@ import uuid
 
 from app.report_factory.report_data_factory import ReportDataFactory
 from app.report_factory.report_generator import ReportGenerator
+from app.services import GCSCSVDataLoader
 from app.services import GCSStorageClientProvider
 from app.services import ReportStorageRepository
 
@@ -24,6 +25,22 @@ class ReportJobManager:
     reports_prefix: str = "reports/generated"
     history_limit: int = 100
     retention_days: int = 30
+    print_key_columns: list[str] = field(
+        default_factory=lambda: ["pub_name", "state", "caption"]
+    )
+    print_date_column: str = "finalschdt"
+    print_kpi_column: str | int | float = 0
+    ev_join_mapping: dict[str, str] = field(
+        default_factory=lambda: {
+            "pub_name": "pub_name",
+            "state": "state",
+            "caption": "caption",
+        }
+    )
+    ev_date_column: str = "finalschdt"
+    ev_kpi_column: str = "kpi"
+    window_before: int = 2
+    window_after: int = 2
 
     _lock: threading.RLock = field(init=False, repr=False)
     _active_threads: dict[str, threading.Thread] = field(
@@ -44,18 +61,24 @@ class ReportJobManager:
             raise ValueError("history_limit must be greater than 0.")
         if self.retention_days <= 0:
             raise ValueError("retention_days must be greater than 0.")
+        if not self.print_key_columns:
+            raise ValueError("print_key_columns must not be empty.")
+        if not self.print_date_column.strip():
+            raise ValueError("print_date_column must not be empty.")
+        if self.window_before < 0 or self.window_after < 0:
+            raise ValueError("window_before and window_after must be >= 0.")
 
         self._lock = threading.RLock()
         self._active_threads = {}
 
-    def submit_job(self, bucket_prefix: str, start_date: str, end_date: str, report_type: str) -> str:
+    def submit_job(self, bucket_prefix: str, start_date: str, end_date: str) -> str:
         """Create and enqueue a background report generation job."""
         report_id = str(uuid.uuid4())
         now = self._now_iso()
 
         job = {
             "report_id": report_id,
-            "report_type": report_type,
+            "report_type": "PRINT",
             "start_date": start_date,
             "end_date": end_date,
             "requested_at": now,
@@ -75,7 +98,7 @@ class ReportJobManager:
 
             worker = threading.Thread(
                 target=self._run_job,
-                args=(report_id, bucket_prefix, start_date, end_date, report_type),
+                args=(report_id, bucket_prefix, start_date, end_date),
                 name=f"report-job-{report_id[:8]}",
                 daemon=True,
             )
@@ -121,29 +144,32 @@ class ReportJobManager:
 
         return None
 
-    def _run_job(self, report_id: str, bucket_prefix: str, start_date: str, end_date: str, report_type: str) -> None:
+    def _run_job(self, report_id: str, bucket_prefix: str, start_date: str, end_date: str) -> None:
         """Execute report generation pipeline and persist result artifacts."""
         try:
+            mapping_loader = GCSCSVDataLoader(client=self.storage_client_provider.get_client())
             report_factory = ReportDataFactory(
                 storage_client_provider=self.storage_client_provider,
                 bucket_prefix=bucket_prefix,
                 start_date=start_date,
                 end_date=end_date,
-                report_type=report_type,
             )
-            load_result = report_factory.build_report_data()
+            dataframes = report_factory.build_combined_dataframes()
 
             report_generator = ReportGenerator(
-                dataframe=load_result.combined_dataframe,
-                report_type=report_type,
+                print_df=dataframes.print_df,
+                ev_df=dataframes.ev_df,
+                contract_df=dataframes.contract_df,
                 start_date=start_date,
                 end_date=end_date,
+                mapping_loader=mapping_loader,
+                key_column=self.print_key_columns,
+                date_column=self.print_date_column,
             )
             report_dataframe = report_generator.generate_report()
 
             filename = self._build_download_filename(
                 report_id=report_id,
-                report_type=report_type,
                 start_date=start_date,
                 end_date=end_date,
             )
@@ -254,16 +280,12 @@ class ReportJobManager:
         return created_at >= cutoff
 
     @staticmethod
-    def _build_download_filename(report_id: str, report_type: str, start_date: str, end_date: str) -> str:
+    def _build_download_filename(report_id: str, start_date: str, end_date: str) -> str:
         """Build safe file name for generated CSV artifacts."""
-        normalized_type = "".join(
-            char
-            for char in report_type.strip().lower()
-            if char.isalnum() or char == "_"
-        )
         start = start_date.replace("-", "")
         end = end_date.replace("-", "")
-        return f"{normalized_type}_{start}_{end}_{report_id[:8]}.csv"
+        report_generation_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return f"report_{report_generation_time}_{start}_{end}_{report_id[:8]}.csv"
 
     @staticmethod
     def _now_iso() -> str:

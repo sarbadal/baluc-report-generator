@@ -6,11 +6,23 @@ from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
 
+import pandas as pd
+
 from app.services import GCSCSVDataLoader
 from app.services import GCSCSVDiscoveryRequest
 from app.services import GCSCSVDiscoveryService
 from app.services import GCSCSVLoadResult
 from app.services import GCSStorageClientProvider
+from app.services import SupportedCSVFileType
+
+
+@dataclass(slots=True)
+class CombinedReportDataFrames:
+    """Combined DataFrames for print, ev, and contract datasets."""
+
+    print_df: pd.DataFrame
+    ev_df: pd.DataFrame
+    contract_df: pd.DataFrame
 
 
 @dataclass(slots=True)
@@ -21,7 +33,6 @@ class ReportDataFactory:
     bucket_prefix: str
     start_date: str
     end_date: str
-    report_type: str
     read_csv_kwargs: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -35,16 +46,50 @@ class ReportDataFactory:
             raise ValueError("start_date must not be empty.")
         if not self.end_date.strip():
             raise ValueError("end_date must not be empty.")
-        if not self.report_type.strip():
-            raise ValueError("report_type must not be empty.")
 
     def build_report_data(self) -> GCSCSVLoadResult:
-        """Discover matching report files and load them into one DataFrame."""
+        """Discover matching Print files and load them into one DataFrame."""
+        return self._load_for_file_type(SupportedCSVFileType.PRINT)
+
+    def build_ev_data(self) -> GCSCSVLoadResult:
+        """Discover matching EV files and load them into one DataFrame."""
+        return self._load_for_file_type(SupportedCSVFileType.EV)
+
+    def build_contract_data(self) -> GCSCSVLoadResult:
+        """Discover matching CONTACT files and load them into one DataFrame."""
+        return self._load_for_file_type(SupportedCSVFileType.CONTACT)
+
+    def build_combined_dataframes(self) -> CombinedReportDataFrames:
+        """Return combined Print, EV, and Contract DataFrames for one date range."""
+        print_result = self.build_report_data()
+        ev_result = self.build_ev_data()
+        contract_result = self.build_contract_data()
+        return CombinedReportDataFrames(
+            print_df=print_result.combined_dataframe,
+            ev_df=ev_result.combined_dataframe,
+            contract_df=contract_result.combined_dataframe,
+        )
+
+    def load_mapping_dataframe(self, gs_path: str, **read_csv_kwargs: Any) -> pd.DataFrame:
+        """Load one mapping CSV from a ``gs://`` path and return a DataFrame."""
+        path = gs_path.strip()
+        if not path:
+            raise ValueError("gs_path must not be empty.")
+
+        client = self.storage_client_provider.get_client()
+        data_loader = GCSCSVDataLoader(client=client)
+
+        options = dict(self.read_csv_kwargs)
+        options.update(read_csv_kwargs)
+        return data_loader.load_blob_path(path, **options)
+
+    def _load_for_file_type(self, file_type: SupportedCSVFileType) -> GCSCSVLoadResult:
+        """Discover matching files for one file type and load them into a DataFrame."""
         request_payload = GCSCSVDiscoveryRequest(
             bucket_name_prefix=self.bucket_prefix,
             start_date=self.start_date,
             end_date=self.end_date,
-            file_type=self.report_type,
+            file_type=file_type,
         )
 
         client = self.storage_client_provider.get_client()

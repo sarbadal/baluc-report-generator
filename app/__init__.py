@@ -67,6 +67,23 @@ def create_app(config_object: str | None = None) -> Flask:
         reports_prefix=str(app.config.get("REPORT_STORAGE_REPORTS_PREFIX", "reports/generated")).strip(),
         history_limit=int(app.config.get("REPORT_HISTORY_LIMIT", 100)),
         retention_days=int(app.config.get("REPORT_RETENTION_DAYS", 30)),
+        print_key_columns=list(app.config.get("REPORT_PRINT_KEY_COLUMNS", ["pub_name", "state", "caption"])),
+        print_date_column=str(app.config.get("REPORT_PRINT_DATE_COLUMN", "finalschdt")).strip(),
+        print_kpi_column=app.config.get("REPORT_PRINT_KPI_COLUMN", 0),
+        ev_join_mapping=dict(
+            app.config.get(
+                "REPORT_EV_JOIN_MAPPING",
+                {
+                    "pub_name": "pub_name",
+                    "state": "state",
+                    "caption": "caption",
+                },
+            )
+        ),
+        ev_date_column=str(app.config.get("REPORT_EV_DATE_COLUMN", "finalschdt")).strip(),
+        ev_kpi_column=str(app.config.get("REPORT_EV_KPI_COLUMN", "kpi")).strip(),
+        window_before=int(app.config.get("REPORT_WINDOW_BEFORE", 2)),
+        window_after=int(app.config.get("REPORT_WINDOW_AFTER", 2)),
     )
 
     register_blueprints(app)
