@@ -6,7 +6,9 @@ from dataclasses import dataclass
 from dataclasses import field
 from datetime import datetime
 from datetime import timedelta
+import logging
 import threading
+from time import perf_counter
 import uuid
 
 from app.report_factory.report_data_factory import ReportDataFactory
@@ -14,6 +16,9 @@ from app.report_factory.report_generator import ReportGenerator
 from app.services import GCSCSVDataLoader
 from app.services import GCSStorageClientProvider
 from app.services import ReportStorageRepository
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -75,6 +80,13 @@ class ReportJobManager:
         """Create and enqueue a background report generation job."""
         report_id = str(uuid.uuid4())
         now = self._now_iso()
+        logger.info(
+            "Submitting report job: report_id=%s start_date=%s end_date=%s bucket_prefix=%s",
+            report_id,
+            start_date,
+            end_date,
+            bucket_prefix,
+        )
 
         job = {
             "report_id": report_id,
@@ -146,7 +158,10 @@ class ReportJobManager:
 
     def _run_job(self, report_id: str, bucket_prefix: str, start_date: str, end_date: str) -> None:
         """Execute report generation pipeline and persist result artifacts."""
+        job_started_at = perf_counter()
+        logger.info("Report job started: report_id=%s", report_id)
         try:
+            data_started_at = perf_counter()
             mapping_loader = GCSCSVDataLoader(client=self.storage_client_provider.get_client())
             report_factory = ReportDataFactory(
                 storage_client_provider=self.storage_client_provider,
@@ -155,7 +170,16 @@ class ReportJobManager:
                 end_date=end_date,
             )
             dataframes = report_factory.build_combined_dataframes()
+            logger.info(
+                "Report job data ready in %.2fs: report_id=%s print_rows=%d ev_rows=%d contract_rows=%d",
+                perf_counter() - data_started_at,
+                report_id,
+                len(dataframes.print_df.index),
+                len(dataframes.ev_df.index),
+                len(dataframes.contract_df.index),
+            )
 
+            transform_started_at = perf_counter()
             report_generator = ReportGenerator(
                 print_df=dataframes.print_df,
                 ev_df=dataframes.ev_df,
@@ -167,6 +191,13 @@ class ReportJobManager:
                 date_column=self.print_date_column,
             )
             report_dataframe = report_generator.generate_report()
+            logger.info(
+                "Report job transform completed in %.2fs: report_id=%s output_rows=%d output_columns=%d",
+                perf_counter() - transform_started_at,
+                report_id,
+                len(report_dataframe.index),
+                len(report_dataframe.columns),
+            )
 
             filename = self._build_download_filename(
                 report_id=report_id,
@@ -175,7 +206,16 @@ class ReportJobManager:
             )
             object_name = f"{self.reports_prefix.strip().strip('/')}/{filename}"
             csv_payload = report_dataframe.to_csv(index=False).encode("utf-8")
+
+            upload_started_at = perf_counter()
             self.storage_repository.upload_csv(object_name=object_name, content=csv_payload)
+            logger.info(
+                "Report job upload completed in %.2fs: report_id=%s object_name=%s bytes=%d",
+                perf_counter() - upload_started_at,
+                report_id,
+                object_name,
+                len(csv_payload),
+            )
 
             self._update_job(
                 report_id,
@@ -186,7 +226,13 @@ class ReportJobManager:
                     "error": None,
                 },
             )
+            logger.info(
+                "Report job completed: report_id=%s total_duration=%.2fs",
+                report_id,
+                perf_counter() - job_started_at,
+            )
         except Exception as exc:
+            logger.exception("Report job failed: report_id=%s error=%s", report_id, exc)
             self._update_job(
                 report_id,
                 {

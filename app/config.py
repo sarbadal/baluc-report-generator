@@ -94,6 +94,10 @@ class BaseConfig:
     REPORT_HISTORY_LIMIT = int(os.getenv("REPORT_HISTORY_LIMIT", "100"))
     REPORT_RETENTION_DAYS = int(os.getenv("REPORT_RETENTION_DAYS", "30"))
     REPORT_STATUS_POLL_SECONDS = int(os.getenv("REPORT_STATUS_POLL_SECONDS", "5"))
+    REPORT_GCS_UPLOAD_TIMEOUT_SECONDS = float(os.getenv("REPORT_GCS_UPLOAD_TIMEOUT_SECONDS", "300"))
+    REPORT_GCS_UPLOAD_RETRY_DEADLINE_SECONDS = float(
+        os.getenv("REPORT_GCS_UPLOAD_RETRY_DEADLINE_SECONDS", "600")
+    )
     REPORT_PRINT_KEY_COLUMNS = [
         column.strip()
         for column in os.getenv("REPORT_PRINT_KEY_COLUMNS", "pub_name,state,caption").split(",")

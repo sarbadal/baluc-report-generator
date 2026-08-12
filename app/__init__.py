@@ -58,6 +58,12 @@ def create_app(config_object: str | None = None) -> Flask:
         metadata_object_name=str(
             app.config.get("REPORT_STORAGE_METADATA_OBJECT", "reports/report_history.json")
         ).strip(),
+        gcs_upload_timeout_seconds=float(
+            app.config.get("REPORT_GCS_UPLOAD_TIMEOUT_SECONDS", 300)
+        ),
+        gcs_upload_retry_deadline_seconds=float(
+            app.config.get("REPORT_GCS_UPLOAD_RETRY_DEADLINE_SECONDS", 600)
+        ),
     )
 
     # Shared background manager for asynchronous report generation jobs.
