@@ -6,7 +6,9 @@ from dataclasses import dataclass
 from datetime import date
 from datetime import datetime
 from enum import Enum
+import logging
 import re
+from time import perf_counter
 from typing import Iterable
 
 from google.cloud import storage
@@ -14,6 +16,9 @@ from google.cloud.storage import Blob
 from google.cloud.storage import Bucket
 
 from app.config import GCS_FILE_DISCOVERY_RULES
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +69,7 @@ class GCSCSVDiscoveryService:
 
     def find_matching_blobs(self, request: GCSCSVDiscoveryRequest) -> list[Blob]:
         """Return matching GCS blob objects for the requested criteria."""
+        started_at = perf_counter()
         prefix = request.bucket_name_prefix.strip()
         if not prefix:
             raise ValueError("bucket_name_prefix must not be empty.")
@@ -86,10 +92,18 @@ class GCSCSVDiscoveryService:
         bucket = self._find_bucket_by_prefix(prefix)
         blobs: list[Blob] = []
         seen_blob_names: set[str] = set()
+        list_blobs_calls = 0
+        listed_blob_candidates = 0
 
         for folder in self._get_folder_candidates(file_type=resolved_file_type, primary_folder=rule.folder):
             for month_prefix in self._iter_month_prefixes(folder, start, end):
+                list_blobs_calls += 1
+                list_started_at = perf_counter()
+                listed_for_prefix = 0
+
                 for blob in bucket.list_blobs(prefix=month_prefix):
+                    listed_for_prefix += 1
+                    listed_blob_candidates += 1
                     if blob.name in seen_blob_names:
                         continue
 
@@ -105,12 +119,36 @@ class GCSCSVDiscoveryService:
                             seen_blob_names.add(blob.name)
                         break
 
+                logger.info(
+                    "GCS list_blobs completed: bucket=%s prefix=%s listed=%d duration_seconds=%.3f",
+                    bucket.name,
+                    month_prefix,
+                    listed_for_prefix,
+                    perf_counter() - list_started_at,
+                )
+
         blobs.sort(key=lambda item: item.name)
+        logger.info(
+            "GCS discovery summary: file_type=%s bucket=%s list_blobs_calls=%d listed_candidates=%d matched=%d total_seconds=%.3f",
+            resolved_file_type.value,
+            bucket.name,
+            list_blobs_calls,
+            listed_blob_candidates,
+            len(blobs),
+            perf_counter() - started_at,
+        )
         return blobs
 
     def _find_bucket_by_prefix(self, bucket_name_prefix: str) -> Bucket:
         """Return the first bucket whose name starts with the provided prefix."""
+        started_at = perf_counter()
         buckets = list(self.client.list_buckets(prefix=bucket_name_prefix, max_results=1))
+        logger.info(
+            "GCS list_buckets completed: prefix=%s matched=%d duration_seconds=%.3f",
+            bucket_name_prefix,
+            len(buckets),
+            perf_counter() - started_at,
+        )
         if not buckets:
             raise FileNotFoundError(
                 f"No GCS bucket found with prefix '{bucket_name_prefix}'."

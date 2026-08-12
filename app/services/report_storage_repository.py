@@ -72,12 +72,30 @@ class GCSReportStorageRepository(ReportStorageRepository):
 
     def load_metadata(self) -> list[dict[str, str | None]]:
         """Load metadata JSON from GCS; return empty list when missing."""
+        started_at = perf_counter()
         client = self.storage_client_provider.get_client()
         blob = client.bucket(self.bucket_name.strip()).blob(self.metadata_object_name)
-        if not blob.exists(client):
+        exists_started_at = perf_counter()
+        blob_exists = blob.exists(client)
+        logger.info(
+            "Checked metadata object existence in %.2fs: bucket=%s object=%s exists=%s",
+            perf_counter() - exists_started_at,
+            self.bucket_name.strip(),
+            self.metadata_object_name,
+            blob_exists,
+        )
+        if not blob_exists:
             return []
 
+        download_started_at = perf_counter()
         payload = blob.download_as_text(encoding="utf-8")
+        logger.info(
+            "Downloaded metadata object in %.2fs: bucket=%s object=%s bytes=%d",
+            perf_counter() - download_started_at,
+            self.bucket_name.strip(),
+            self.metadata_object_name,
+            len(payload.encode("utf-8")),
+        )
         try:
             data = json.loads(payload)
         except json.JSONDecodeError:
@@ -90,6 +108,13 @@ class GCSReportStorageRepository(ReportStorageRepository):
         for item in data:
             if isinstance(item, dict):
                 normalized.append(item)
+        logger.info(
+            "Loaded report metadata in %.2fs: bucket=%s object=%s entries=%d",
+            perf_counter() - started_at,
+            self.bucket_name.strip(),
+            self.metadata_object_name,
+            len(normalized),
+        )
         return normalized
 
     def save_metadata(self, metadata: list[dict[str, str | None]]) -> None:

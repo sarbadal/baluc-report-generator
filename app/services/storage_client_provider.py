@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import threading
 
 from google.cloud import storage
 from google.oauth2 import service_account
+
+
+logger = logging.getLogger(__name__)
 
 
 class GCSStorageClientProvider:
@@ -15,6 +20,8 @@ class GCSStorageClientProvider:
     def __init__(self, project: str | None = None) -> None:
         """Initialize provider with an optional GCP project override."""
         self.project = (project or "").strip() or self._resolve_project_from_env()
+        self._client_lock = threading.RLock()
+        self._cached_client: storage.Client | None = None
 
     def get_client(self) -> storage.Client:
         """Return a Google Cloud Storage client instance.
@@ -22,6 +29,22 @@ class GCSStorageClientProvider:
         If ``GOOGLE_AUTH_KEY_JSON`` is set, it is parsed as service account
         JSON content or treated as a file path to a service account JSON file.
         """
+        if self._cached_client is not None:
+            return self._cached_client
+
+        with self._client_lock:
+            if self._cached_client is not None:
+                return self._cached_client
+
+            self._cached_client = self._create_client()
+            logger.info(
+                "Initialized shared GCS client: project=%s",
+                self._cached_client.project,
+            )
+            return self._cached_client
+
+    def _create_client(self) -> storage.Client:
+        """Create one storage client for this provider instance."""
         key_source = os.getenv("GOOGLE_AUTH_KEY_JSON", "").strip()
         if key_source:
             credentials, resolved_project = self._build_credentials_from_env_value(
