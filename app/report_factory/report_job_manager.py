@@ -276,7 +276,7 @@ class ReportJobManager:
 
     def _apply_retention_unlocked(self, history: list[dict[str, str | None]]) -> tuple[list[dict[str, str | None]], set[str]]:
         """Apply retention and return kept entries plus removed CSV object names."""
-        cutoff = datetime.utcnow() - timedelta(days=self.retention_days)
+        cutoff = datetime.now() - timedelta(days=self.retention_days)
         kept: list[dict[str, str | None]] = []
         removed_objects: set[str] = set()
 
@@ -335,5 +335,5 @@ class ReportJobManager:
 
     @staticmethod
     def _now_iso() -> str:
-        """Return current UTC timestamp in ISO format."""
-        return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+        """Return current local timestamp with timezone in ISO format."""
+        return datetime.now().astimezone().replace(microsecond=0).isoformat()

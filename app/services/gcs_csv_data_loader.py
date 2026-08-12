@@ -52,11 +52,11 @@ class GCSCSVDataLoader:
                 bucket_name, blob_name = self._parse_gs_path(blob_path)
                 blob = self.client.bucket(bucket_name).blob(blob_name)
 
-                download_started_at_wall = datetime.utcnow().isoformat() + "Z"
+                download_started_at_wall = datetime.now().astimezone().isoformat(timespec="seconds")
                 download_started_at = perf_counter()
                 csv_bytes = blob.download_as_bytes()
                 download_ended_at = perf_counter()
-                download_ended_at_wall = datetime.utcnow().isoformat() + "Z"
+                download_ended_at_wall = datetime.now().astimezone().isoformat(timespec="seconds")
                 download_duration_seconds = download_ended_at - download_started_at
                 total_download_seconds += download_duration_seconds
 
@@ -123,11 +123,11 @@ class GCSCSVDataLoader:
         if not blob.exists(self.client):
             raise FileNotFoundError(f"CSV file was not found at path: {blob_path}")
 
-        download_started_at_wall = datetime.utcnow().isoformat() + "Z"
+        download_started_at_wall = datetime.now().astimezone().isoformat(timespec="seconds")
         download_started_at = perf_counter()
         csv_bytes = blob.download_as_bytes()
         download_ended_at = perf_counter()
-        download_ended_at_wall = datetime.utcnow().isoformat() + "Z"
+        download_ended_at_wall = datetime.now().astimezone().isoformat(timespec="seconds")
 
         parse_started_at = perf_counter()
         dataframe = pd.read_csv(BytesIO(csv_bytes), **read_csv_kwargs)
