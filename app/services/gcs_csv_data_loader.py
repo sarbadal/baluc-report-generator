@@ -4,11 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from io import BytesIO
+import logging
 import re
 from typing import Any
 
 import pandas as pd
 from google.cloud import storage
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -74,7 +78,15 @@ class GCSCSVDataLoader:
             raise FileNotFoundError(f"CSV file was not found at path: {blob_path}")
 
         csv_bytes = blob.download_as_bytes()
-        return pd.read_csv(BytesIO(csv_bytes), **read_csv_kwargs)
+        dataframe = pd.read_csv(BytesIO(csv_bytes), **read_csv_kwargs)
+        logger.info(
+            "Loaded CSV from GCS: path=%s rows=%d columns=%d bytes=%d",
+            blob_path,
+            len(dataframe.index),
+            len(dataframe.columns),
+            len(csv_bytes),
+        )
+        return dataframe
 
     @staticmethod
     def _parse_gs_path(path: str) -> tuple[str, str]:
