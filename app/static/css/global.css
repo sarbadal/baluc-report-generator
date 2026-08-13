@@ -1,5 +1,6 @@
 :root {
   --ui-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --footer-height: 52px;
   --header-border: rgba(17, 53, 72, 0.14);
   --header-bg: rgba(252, 253, 255, 0.92);
   --brand-color: #24435a;
@@ -37,6 +38,7 @@ body {
 
 .app-main {
   flex: 1;
+  padding-bottom: var(--footer-height);
 }
 
 .app-header {
@@ -110,7 +112,11 @@ body {
 }
 
 .app-footer {
-  margin-top: auto;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
   border-top: 1px solid var(--footer-border);
   background: var(--footer-bg);
 }
@@ -139,6 +145,10 @@ body {
 }
 
 @media (max-width: 620px) {
+  :root {
+    --footer-height: 48px;
+  }
+
   .app-header-inner {
     padding: 10px 14px;
     align-items: center;

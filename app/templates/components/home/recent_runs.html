@@ -12,7 +12,12 @@
         <p class="item-title">{{ report.report_type }} | {{ report.start_date }} to {{ report.end_date }}</p>
         <p class="item-sub">Requested at {{ report.requested_at }}</p>
       </div>
-      <span class="badge {{ report.status | lower }}">{{ report.status }}</span>
+      <div class="item-actions">
+        <span class="badge {{ report.status | lower }}">{{ report.status }}</span>
+        {% if report.status == "Completed" and report.report_id %}
+        <a class="view-link" href="{{ url_for('home.view_report_table', report_id=report.report_id) }}">View Report</a>
+        {% endif %}
+      </div>
     </li>
     {% endfor %}
   </ul>

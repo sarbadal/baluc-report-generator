@@ -1,0 +1,70 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}CSV Preview | BaluC{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ static_asset('css/report_preview.css') }}" />
+{% endblock %}
+
+{% block body %}
+<main class="preview-page">
+  <section class="preview-card">
+    <div class="preview-header">
+      <div>
+        <h1>CSV Preview</h1>
+        <p class="meta">Report ID: {{ report_id }}</p>
+        <p class="meta">File: {{ filename }}</p>
+      </div>
+      <div class="actions">
+        <a class="btn" href="{{ url_for('home.report_generator_page') }}">Back to Queue</a>
+        <a class="btn btn-primary" href="{{ url_for('home.download_formatted_report', report_id=report_id) }}">Download CSV</a>
+      </div>
+    </div>
+
+    <p class="summary">{{ row_count }} data rows</p>
+
+    {% if headers %}
+    <div class="table-wrap{% if row_count > 10 %} is-scrollable{% endif %}">
+      <table>
+        <thead>
+          {% if grouped_headers %}
+          <tr class="header-group-row">
+            {% for top_header in top_headers %}
+            <th
+              {% if top_header.rowspan is defined %}rowspan="{{ top_header.rowspan }}"{% endif %}
+              {% if top_header.colspan is defined %}colspan="{{ top_header.colspan }}"{% endif %}
+            >
+              {{ top_header.label }}
+            </th>
+            {% endfor %}
+          </tr>
+          <tr class="header-detail-row">
+            {% for header in grouped_headers %}
+            <th title="{{ header.full }}">{{ header.short }}</th>
+            {% endfor %}
+          </tr>
+          {% else %}
+          <tr>
+            {% for header in headers %}
+            <th>{{ header }}</th>
+            {% endfor %}
+          </tr>
+          {% endif %}
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            {% for value in row %}
+            <td{% if loop.index0 in metric_column_indexes %} class="metric-cell"{% endif %}>{{ value }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty">No table data available for this report.</p>
+    {% endif %}
+  </section>
+</main>
+{% endblock %}

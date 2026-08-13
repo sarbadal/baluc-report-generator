@@ -108,7 +108,14 @@ class ReportJobManager:
             history = self._read_history()
         except Exception:
             return []
-        return history[:limit]
+        recent_jobs: list[dict[str, str | None]] = []
+        for row in history[:limit]:
+            entry = dict(row)
+            requested_at = entry.get("requested_at")
+            if isinstance(requested_at, str) and requested_at.strip():
+                entry["requested_at"] = self._format_ist_timestamp(requested_at)
+            recent_jobs.append(entry)
+        return recent_jobs
 
     def get_download_file(self, report_id: str) -> tuple[str, bytes] | None:
         """Return filename and CSV bytes for a completed report, if available."""
@@ -248,3 +255,18 @@ class ReportJobManager:
         else:
             created_at = created_at.astimezone(IST_TZ)
         return created_at >= cutoff
+
+    @staticmethod
+    def _format_ist_timestamp(value: str) -> str:
+        """Format an ISO-like timestamp into an IST display string."""
+        normalized = value.strip().replace("Z", "+00:00")
+        try:
+            parsed_at = datetime.fromisoformat(normalized)
+        except ValueError:
+            return value
+
+        if parsed_at.tzinfo is None:
+            parsed_at = parsed_at.replace(tzinfo=IST_TZ)
+        else:
+            parsed_at = parsed_at.astimezone(IST_TZ)
+        return parsed_at.strftime("%Y-%m-%d %H:%M:%S IST")

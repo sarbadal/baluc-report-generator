@@ -214,7 +214,7 @@ class ReportAggregationTransformer:
             )
 
         report = report[self.INTERMEDIATE_REPORT_COLUMNS + window_cols]
-        report = report.rename(columns={"finalschdt": "date"})
+        report = report.rename(columns={"finalschdt": "date", "pub_name": "publication original"})
         return report[self.REPORT_BASE_OUTPUT_COLUMNS + window_cols]
 
     def _group_by_key(self, df: pd.DataFrame, key_columns: list[str]) -> pd.DataFrame:
