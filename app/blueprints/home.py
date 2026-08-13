@@ -29,7 +29,11 @@ def home():
     recent_reports = report_job_manager.list_recent_jobs(limit=RECENT_REPORTS_LIMIT)
     completed_count = sum(1 for report in recent_reports if report.get("status") == "Completed")
     failed_count = sum(1 for report in recent_reports if report.get("status") == "Failed")
-    generating_count = sum(1 for report in recent_reports if report.get("status") == "Generating")
+    generating_count = sum(
+        1
+        for report in recent_reports
+        if report.get("status") in {"Generating", "Processing"}
+    )
 
     return render_template(
         "home.html",

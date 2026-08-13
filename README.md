@@ -80,9 +80,16 @@ Core app/runtime variables:
 - REPORT_HISTORY_LIMIT
 - REPORT_RETENTION_DAYS
 - REPORT_STATUS_POLL_SECONDS
+- REPORT_TRIGGER_FUNCTION_URL
 - STATIC_BUCKET
 - STATIC_GCS_PREFIX
 - STATIC_ASSET_BASE_URL
+
+Notes:
+
+- The Flask app triggers report generation via `REPORT_TRIGGER_FUNCTION_URL`.
+- The trigger target can be any external HTTP service (for example, a separately deployed `process_in_bq` function).
+- Flask has no import/runtime dependency on the `process_in_bq` folder being present in this repository.
 
 ## Deployment (Google Cloud Functions Gen2)
 
