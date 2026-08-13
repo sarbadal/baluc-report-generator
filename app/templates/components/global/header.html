@@ -2,8 +2,8 @@
   <div class="app-header-inner">
     <a class="app-brand" href="{{ url_for('home.home') }}">BaluC Ops Desk</a>
     <nav class="app-nav" aria-label="Primary">
-      <a class="app-nav-link" href="{{ url_for('home.home') }}">Home</a>
-      <a class="app-nav-link" href="{{ url_for('home.report_generator_page') }}">Report Generator</a>
+      <a class="app-nav-link{% if request.endpoint == 'home.home' %} is-active{% endif %}" href="{{ url_for('home.home') }}" {% if request.endpoint == 'home.home' %}aria-current="page"{% endif %}>Home</a>
+      <a class="app-nav-link{% if request.endpoint == 'home.report_generator_page' %} is-active{% endif %}" href="{{ url_for('home.report_generator_page') }}" {% if request.endpoint == 'home.report_generator_page' %}aria-current="page"{% endif %}>Report Generator</a>
       <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Toggle dark and light theme">
         <span class="theme-toggle-label" id="theme-toggle-label">Dark</span>
       </button>

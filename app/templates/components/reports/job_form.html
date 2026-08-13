@@ -9,7 +9,7 @@
     </div>
     <div class="field field-end">
       <label for="end_date">End Date</label>
-      <input id="end_date" name="end_date" type="date" value="{{ form_data.end_date }}" required />
+      <input id="end_date" name="end_date" type="date" value="{{ form_data.end_date }}" min="{{ form_data.start_date }}" required />
     </div>
     <button type="submit" class="submit-compact">Generate</button>
   </form>

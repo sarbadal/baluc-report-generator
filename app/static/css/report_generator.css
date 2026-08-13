@@ -3,6 +3,7 @@
   --soft: #536778;
   --panel: #ffffff;
   --line: #cfdeea;
+  --field-bg: #ffffff;
   --accent: #0d6b6d;
   --accent-strong: #0a5254;
   --accent-warm: #bb4d17;
@@ -10,14 +11,15 @@
 }
 
 :root[data-theme="dark"] {
-  --ink: #e4eef4;
-  --soft: #aabccc;
-  --panel: #102837;
-  --line: #345064;
-  --accent: #3b9ea0;
-  --accent-strong: #2a7e80;
-  --accent-warm: #d6804f;
-  --alert: #ff9f8f;
+  --ink: #e3e6ea;
+  --soft: #aaafb8;
+  --panel: #1e2128;
+  --line: #3a3e47;
+  --field-bg: #2a2e36;
+  --accent: #8d929b;
+  --accent-strong: #787d86;
+  --accent-warm: #969ba4;
+  --alert: #d5a8a3;
 }
 
 * {
@@ -37,9 +39,9 @@ body {
 
 :root[data-theme="dark"] body {
   background:
-    radial-gradient(980px 380px at 100% 0%, rgba(59, 158, 160, 0.28), rgba(59, 158, 160, 0) 62%),
-    radial-gradient(800px 340px at 0% 12%, rgba(214, 128, 79, 0.22), rgba(214, 128, 79, 0) 66%),
-    linear-gradient(180deg, #08161f 0%, #0f2430 100%);
+    radial-gradient(980px 380px at 100% 0%, rgba(108, 114, 123, 0.28), rgba(108, 114, 123, 0) 62%),
+    radial-gradient(800px 340px at 0% 12%, rgba(137, 142, 151, 0.24), rgba(137, 142, 151, 0) 66%),
+    linear-gradient(180deg, #121418 0%, #1a1d24 100%);
 }
 
 .page {
@@ -144,6 +146,17 @@ button {
   font-size: 12px;
 }
 
+input,
+select {
+  background: var(--field-bg);
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select {
+  color-scheme: dark;
+}
+
 button {
   border: none;
   color: #fff;
@@ -206,8 +219,8 @@ button:hover {
 }
 
 :root[data-theme="dark"] .error {
-  background: rgba(158, 39, 21, 0.2);
-  border-color: rgba(255, 159, 143, 0.55);
+  background: rgba(93, 63, 60, 0.32);
+  border-color: rgba(177, 145, 140, 0.55);
 }
 
 .success {
@@ -221,9 +234,9 @@ button:hover {
 }
 
 :root[data-theme="dark"] .success {
-  background: rgba(14, 97, 63, 0.26);
-  border-color: rgba(196, 233, 210, 0.45);
-  color: #d6f0e2;
+  background: rgba(69, 79, 73, 0.34);
+  border-color: rgba(145, 156, 149, 0.45);
+  color: #d4d9d5;
 }
 
 .queue {
@@ -271,11 +284,11 @@ button:hover {
 }
 
 :root[data-theme="dark"] .job {
-  background: #153042;
+  background: #262a32;
 }
 
 .job-row {
-  grid-template-columns: minmax(68px, 0.65fr) minmax(180px, 1.4fr) minmax(120px, 1fr) auto auto;
+  grid-template-columns: minmax(68px, 0.65fr) minmax(180px, 1.4fr) minmax(120px, 1fr) auto auto auto;
   align-items: center;
   column-gap: 8px;
 }
@@ -329,6 +342,18 @@ button:hover {
   text-decoration: none;
   color: #fff;
   background: var(--accent-warm);
+  padding: 4px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.view-report {
+  text-decoration: none;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
   padding: 4px 7px;
   border-radius: 6px;
   font-size: 10px;

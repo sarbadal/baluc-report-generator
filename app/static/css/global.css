@@ -8,6 +8,8 @@
   --nav-border: rgba(17, 53, 72, 0.18);
   --nav-bg: #ffffff;
   --nav-hover-bg: #f1f7fb;
+  --nav-active-bg: #2b3038;
+  --nav-active-text: #f7f9fc;
   --footer-border: rgba(17, 53, 72, 0.14);
   --footer-bg: rgba(252, 253, 255, 0.94);
   --footer-text: #2f4a61;
@@ -15,17 +17,19 @@
 }
 
 :root[data-theme="dark"] {
-  --header-border: rgba(161, 202, 225, 0.22);
-  --header-bg: rgba(9, 22, 32, 0.9);
-  --brand-color: #cfe5f3;
-  --nav-text: #e0edf5;
-  --nav-border: rgba(161, 202, 225, 0.35);
-  --nav-bg: #123043;
-  --nav-hover-bg: #194057;
-  --footer-border: rgba(161, 202, 225, 0.22);
-  --footer-bg: rgba(9, 22, 32, 0.9);
-  --footer-text: #bcd3e2;
-  --theme-toggle-text: #ffe9cf;
+  --header-border: rgba(185, 190, 198, 0.22);
+  --header-bg: rgba(22, 24, 28, 0.92);
+  --brand-color: #e3e6eb;
+  --nav-text: #d9dce2;
+  --nav-border: rgba(175, 181, 190, 0.35);
+  --nav-bg: #2a2d33;
+  --nav-hover-bg: #353941;
+  --nav-active-bg: #eceef2;
+  --nav-active-text: #1f2329;
+  --footer-border: rgba(185, 190, 198, 0.22);
+  --footer-bg: rgba(22, 24, 28, 0.94);
+  --footer-text: #c8ccd3;
+  --theme-toggle-text: #d4d8df;
 }
 
 body {
@@ -74,7 +78,7 @@ body {
 .app-nav {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
   margin-left: auto;
   flex-wrap: nowrap;
 }
@@ -82,33 +86,48 @@ body {
 .app-nav-link {
   text-decoration: none;
   color: var(--nav-text);
-  border: 1px solid var(--nav-border);
-  border-radius: 999px;
-  padding: 7px 11px;
+  border: 0;
+  border-radius: 0;
+  padding: 2px 0;
   font-size: 13px;
-  font-weight: 700;
-  background: var(--nav-bg);
+  font-weight: 600;
+  background: transparent;
   white-space: nowrap;
+  transition: color 120ms ease, border-color 120ms ease;
+  border-bottom: 1px solid transparent;
 }
 
 .app-nav-link:hover {
-  background: var(--nav-hover-bg);
+  color: var(--brand-color);
+  border-bottom-color: var(--nav-border);
+}
+
+.app-nav-link.is-active,
+.app-nav-link[aria-current="page"] {
+  color: var(--brand-color);
+  border-bottom-color: currentColor;
+  font-weight: 700;
 }
 
 .theme-toggle {
-  border: 1px solid var(--nav-border);
+  border: 0;
   background: transparent;
   color: var(--theme-toggle-text);
-  border-radius: 999px;
-  padding: 7px 11px;
+  border-radius: 0;
+  padding: 2px 0;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  min-width: 0;
+  text-align: center;
+  transition: color 120ms ease, border-color 120ms ease;
+  border-bottom: 1px solid transparent;
 }
 
 .theme-toggle:hover {
-  background: var(--nav-hover-bg);
+  color: var(--brand-color);
+  border-bottom-color: var(--nav-border);
 }
 
 .app-footer {

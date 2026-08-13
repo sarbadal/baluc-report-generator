@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 from datetime import datetime
+from datetime import date
 from io import BytesIO
 from io import StringIO
 import os
@@ -81,6 +82,11 @@ def report_generator_page():
 
     if request.method == "POST":
         try:
+            start_date = _parse_iso_date(form_data["start_date"], field_name="start_date")
+            end_date = _parse_iso_date(form_data["end_date"], field_name="end_date")
+            if end_date < start_date:
+                raise ValueError("end_date must be greater than or equal to start_date.")
+
             bucket_prefix = (
                 current_app.config.get("REPORT_GCS_BUCKET_PREFIX")
                 or current_app.config.get("REPORT_STORAGE_BUCKET_NAME")
@@ -191,8 +197,10 @@ def report_status():
         status = row.get("status")
         if isinstance(report_id, str) and status == "Completed":
             row["download_url"] = url_for("home.download_report", report_id=report_id)
+            row["view_url"] = url_for("home.view_report_table", report_id=report_id)
         else:
             row["download_url"] = None
+            row["view_url"] = None
         payload.append(row)
 
     return jsonify({"reports": payload})
@@ -343,3 +351,12 @@ def _build_formatted_filename(filename: str) -> str:
     if stripped.lower().endswith(".csv"):
         return f"{stripped[:-4]}_formatted.csv"
     return f"{stripped}_formatted.csv"
+
+
+def _parse_iso_date(value: str, *, field_name: str) -> date:
+    """Parse YYYY-MM-DD date input and raise a clear error for invalid values."""
+    normalized = value.strip()
+    try:
+        return date.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be a valid date in YYYY-MM-DD format.") from exc
