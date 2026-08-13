@@ -8,6 +8,7 @@ from datetime import datetime
 from datetime import timedelta
 import json
 import logging
+import ssl
 from urllib import error
 from urllib import request
 from zoneinfo import ZoneInfo
@@ -32,6 +33,9 @@ class ReportJobManager:
     trigger_function_url: str = ""
     trigger_timeout_seconds: float = 30.0
     trigger_auth_token: str = ""
+    trigger_ca_bundle_path: str = ""
+    trigger_insecure_skip_verify: bool = False
+    trigger_disable_system_proxy: bool = False
     print_key_columns: list[str] = field(
         default_factory=lambda: ["pub_name", "state", "caption"]
     )
@@ -69,6 +73,10 @@ class ReportJobManager:
             raise ValueError("window_before and window_after must be >= 0.")
         if self.trigger_timeout_seconds <= 0:
             raise ValueError("trigger_timeout_seconds must be greater than 0.")
+        if self.trigger_insecure_skip_verify and self.trigger_ca_bundle_path.strip():
+            raise ValueError(
+                "Use either trigger_insecure_skip_verify or trigger_ca_bundle_path, not both."
+            )
 
     def submit_job(self, bucket_prefix: str, start_date: str, end_date: str) -> str:
         """Forward report request to the standalone processor Cloud Function."""
@@ -165,8 +173,35 @@ class ReportJobManager:
             method="POST",
         )
 
+        ssl_context: ssl.SSLContext | None = None
+        if self.trigger_insecure_skip_verify:
+            ssl_context = ssl._create_unverified_context()
+        elif self.trigger_ca_bundle_path.strip():
+            ssl_context = ssl.create_default_context(
+                cafile=self.trigger_ca_bundle_path.strip()
+            )
+
+        handlers: list[object] = []
+        if self.trigger_disable_system_proxy:
+            handlers.append(request.ProxyHandler({}))
+        if ssl_context is not None:
+            handlers.append(request.HTTPSHandler(context=ssl_context))
+
+        opener = request.build_opener(*handlers) if handlers else None
+
         try:
-            with request.urlopen(trigger_request, timeout=self.trigger_timeout_seconds) as response:
+            if opener is not None:
+                response = opener.open(
+                    trigger_request,
+                    timeout=self.trigger_timeout_seconds,
+                )
+            else:
+                response = request.urlopen(
+                    trigger_request,
+                    timeout=self.trigger_timeout_seconds,
+                )
+
+            with response:
                 response_body = response.read().decode("utf-8")
                 status_code = int(response.status)
         except error.HTTPError as exc:
@@ -175,6 +210,12 @@ class ReportJobManager:
                 f"Trigger function HTTP {exc.code}: {error_body}"
             ) from exc
         except error.URLError as exc:
+            if isinstance(exc.reason, ssl.SSLCertVerificationError):
+                raise RuntimeError(
+                    "Trigger function TLS certificate verification failed. "
+                    "Configure REPORT_TRIGGER_CA_BUNDLE_PATH or (dev only) "
+                    "REPORT_TRIGGER_INSECURE_SKIP_VERIFY=true."
+                ) from exc
             raise RuntimeError(f"Trigger function connection failed: {exc.reason}") from exc
 
         if status_code < 200 or status_code >= 300:

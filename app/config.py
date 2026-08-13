@@ -97,6 +97,15 @@ class BaseConfig:
     REPORT_TRIGGER_FUNCTION_URL = os.getenv("REPORT_TRIGGER_FUNCTION_URL", "").strip()
     REPORT_TRIGGER_TIMEOUT_SECONDS = float(os.getenv("REPORT_TRIGGER_TIMEOUT_SECONDS", "30"))
     REPORT_TRIGGER_AUTH_TOKEN = os.getenv("REPORT_TRIGGER_AUTH_TOKEN", "").strip()
+    REPORT_TRIGGER_CA_BUNDLE_PATH = os.getenv("REPORT_TRIGGER_CA_BUNDLE_PATH", "").strip()
+    REPORT_TRIGGER_INSECURE_SKIP_VERIFY = (
+        os.getenv("REPORT_TRIGGER_INSECURE_SKIP_VERIFY", "false").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
+    REPORT_TRIGGER_DISABLE_SYSTEM_PROXY = (
+        os.getenv("REPORT_TRIGGER_DISABLE_SYSTEM_PROXY", "false").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
     REPORT_GCS_UPLOAD_TIMEOUT_SECONDS = float(os.getenv("REPORT_GCS_UPLOAD_TIMEOUT_SECONDS", "300"))
     REPORT_GCS_UPLOAD_RETRY_DEADLINE_SECONDS = float(
         os.getenv("REPORT_GCS_UPLOAD_RETRY_DEADLINE_SECONDS", "600")

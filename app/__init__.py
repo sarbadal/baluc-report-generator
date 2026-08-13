@@ -6,10 +6,73 @@ point and by tests.
 
 from datetime import datetime
 import os
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from flask import Flask
 from flask import url_for
+from dotenv import load_dotenv
+
+
+IST_TZ = ZoneInfo("Asia/Kolkata")
+
+# Ensure local runs (python main.py) load the project-root .env reliably.
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_ENV_PATH = _PROJECT_ROOT / ".env"
+load_dotenv(dotenv_path=_ENV_PATH, override=True)
+
+
+def _load_selected_env_keys(dotenv_path: Path, keys: set[str]) -> None:
+    """Load selected KEY=VALUE pairs from .env, tolerating unrelated multiline values."""
+    if not dotenv_path.exists() or not dotenv_path.is_file():
+        return
+
+    in_multiline = False
+    multiline_quote = ""
+    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        if in_multiline:
+            if line.endswith(multiline_quote):
+                in_multiline = False
+                multiline_quote = ""
+            continue
+
+        if line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+
+        if value and value[0] in {'"', "'"} and (len(value) == 1 or value[-1] != value[0]):
+            in_multiline = True
+            multiline_quote = value[0]
+
+        if key not in keys:
+            continue
+
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+            value = value[1:-1]
+
+        os.environ[key] = value
+
+
+_load_selected_env_keys(
+    _ENV_PATH,
+    {
+        "APP_ENV",
+        "ENV_TYPE",
+        "REPORT_TRIGGER_FUNCTION_URL",
+        "REPORT_TRIGGER_TIMEOUT_SECONDS",
+        "REPORT_TRIGGER_AUTH_TOKEN",
+        "REPORT_TRIGGER_CA_BUNDLE_PATH",
+        "REPORT_TRIGGER_INSECURE_SKIP_VERIFY",
+        "REPORT_TRIGGER_DISABLE_SYSTEM_PROXY",
+    },
+)
 
 from app.blueprints import register_blueprints
 from app.config import get_config
@@ -18,9 +81,6 @@ from app.extensions import init_extensions
 from app.report_factory import ReportJobManager
 from app.services import GCSReportStorageRepository
 from app.services import GCSStorageClientProvider
-
-
-IST_TZ = ZoneInfo("Asia/Kolkata")
 
 
 def create_app(config_object: str | None = None) -> Flask:
@@ -80,6 +140,13 @@ def create_app(config_object: str | None = None) -> Flask:
         trigger_function_url=str(app.config.get("REPORT_TRIGGER_FUNCTION_URL", "")).strip(),
         trigger_timeout_seconds=float(app.config.get("REPORT_TRIGGER_TIMEOUT_SECONDS", 30)),
         trigger_auth_token=str(app.config.get("REPORT_TRIGGER_AUTH_TOKEN", "")).strip(),
+        trigger_ca_bundle_path=str(app.config.get("REPORT_TRIGGER_CA_BUNDLE_PATH", "")).strip(),
+        trigger_insecure_skip_verify=bool(
+            app.config.get("REPORT_TRIGGER_INSECURE_SKIP_VERIFY", False)
+        ),
+        trigger_disable_system_proxy=bool(
+            app.config.get("REPORT_TRIGGER_DISABLE_SYSTEM_PROXY", False)
+        ),
         print_key_columns=list(app.config.get("REPORT_PRINT_KEY_COLUMNS", ["pub_name", "state", "caption"])),
         print_date_column=str(app.config.get("REPORT_PRINT_DATE_COLUMN", "finalschdt")).strip(),
         print_kpi_column=app.config.get("REPORT_PRINT_KPI_COLUMN", 0),
