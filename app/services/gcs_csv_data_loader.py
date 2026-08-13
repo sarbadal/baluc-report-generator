@@ -49,31 +49,39 @@ class GCSCSVDataLoader:
         total_download_seconds = 0.0
         total_parse_seconds = 0.0
 
+        if not blob_paths:
+            return GCSCSVLoadResult(
+                discovered_files=[],
+                loaded_files=[],
+                failed_files=[],
+                combined_dataframe=pd.DataFrame(),
+            )
+
+        logger.info(
+            "GCS CSV batch load starting (sequential): discovered=%d",
+            len(blob_paths),
+        )
+
         for blob_path in blob_paths:
             try:
-                bucket_name, blob_name = self._parse_gs_path(blob_path)
-                blob = self.client.bucket(bucket_name).blob(blob_name)
-
-                download_started_at_wall = datetime.now(IST_TZ).isoformat(timespec="seconds")
-                download_started_at = perf_counter()
-                csv_bytes = blob.download_as_bytes()
-                download_ended_at = perf_counter()
-                download_ended_at_wall = datetime.now(IST_TZ).isoformat(timespec="seconds")
-                download_duration_seconds = download_ended_at - download_started_at
+                (
+                    blob_name,
+                    dataframe,
+                    download_started_at_wall,
+                    download_ended_at_wall,
+                    download_duration_seconds,
+                    parse_duration_seconds,
+                    size_bytes,
+                ) = self._load_single_blob_for_batch(blob_path, read_csv_kwargs)
                 total_download_seconds += download_duration_seconds
-
-                parse_started_at = perf_counter()
-                dataframe = pd.read_csv(BytesIO(csv_bytes), **read_csv_kwargs)
-                parse_duration_seconds = perf_counter() - parse_started_at
                 total_parse_seconds += parse_duration_seconds
-
-                dataframes.append(dataframe)
                 loaded_files.append(blob_path)
+                dataframes.append(dataframe)
                 logger.info(
                     "GCS CSV load succeeded: path=%s object=%s size_bytes=%d download_start=%s download_end=%s download_seconds=%.3f parse_seconds=%.3f rows=%d columns=%d",
                     blob_path,
                     blob_name,
-                    len(csv_bytes),
+                    size_bytes,
                     download_started_at_wall,
                     download_ended_at_wall,
                     download_duration_seconds,
@@ -111,6 +119,31 @@ class GCSCSVDataLoader:
             loaded_files=loaded_files,
             failed_files=failed_files,
             combined_dataframe=combined_dataframe,
+        )
+
+    def _load_single_blob_for_batch(self, blob_path: str, read_csv_kwargs: dict[str, Any]) -> tuple[str, pd.DataFrame, str, str, float, float, int]:
+        """Download and parse one blob path for sequential batch loading."""
+        bucket_name, blob_name = self._parse_gs_path(blob_path)
+        blob = self.client.bucket(bucket_name).blob(blob_name)
+
+        download_started_at_wall = datetime.now(IST_TZ).isoformat(timespec="seconds")
+        download_started_at = perf_counter()
+        csv_bytes = blob.download_as_bytes()
+        download_ended_at = perf_counter()
+        download_ended_at_wall = datetime.now(IST_TZ).isoformat(timespec="seconds")
+
+        parse_started_at = perf_counter()
+        dataframe = pd.read_csv(BytesIO(csv_bytes), **read_csv_kwargs)
+        parse_duration_seconds = perf_counter() - parse_started_at
+
+        return (
+            blob_name,
+            dataframe,
+            download_started_at_wall,
+            download_ended_at_wall,
+            download_ended_at - download_started_at,
+            parse_duration_seconds,
+            len(csv_bytes),
         )
 
     def load_blob_path(self, blob_path: str, **read_csv_kwargs: Any) -> pd.DataFrame:
