@@ -189,6 +189,15 @@ tbody td.metric-cell.narrow-metric-col {
   border-right: 3px solid var(--preview-separator);
 }
 
+.subgroup-separator-left {
+  border-left: 2px solid var(--preview-line);
+}
+
+.table-wrap th.terminal-separator-right,
+.table-wrap td.terminal-separator-right {
+  border-right: 3px solid var(--preview-separator) !important;
+}
+
 tbody tr:nth-child(even) {
   background: rgba(79, 84, 93, 0.1);
 }

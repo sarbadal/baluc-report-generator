@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import csv
+from dataclasses import dataclass
 from datetime import datetime
 from datetime import date
 from io import BytesIO
 from io import StringIO
 import os
+from typing import TypedDict
 from zoneinfo import ZoneInfo
 
 from flask import abort
@@ -56,6 +58,59 @@ PV_GROWTH_COLUMNS = [
     "pv_growth_enquery_count_date_p2_vs_t_avg",
 ]
 PERCENTAGE_FORMAT_COLUMNS = set(EV_GROWTH_COLUMNS + PV_GROWTH_COLUMNS)
+GROWTH_EMPTY_CONDITIONS: dict[str, tuple[str, str]] = {
+    "ev_growth_enquery_count_date_t_vs_m2_avg": (
+        "ev_perf_enquery_count_date_m2_m1_avg",
+        "ev_perf_enquery_count_date_t_avg",
+    ),
+    "ev_growth_enquery_count_date_p2_vs_t_avg": (
+        "ev_perf_enquery_count_date_t_avg",
+        "ev_perf_enquery_count_date_p2_p1_avg",
+    ),
+    "pv_growth_enquery_count_date_t_vs_m2_avg": (
+        "pv_perf_enquery_count_date_m2_m1_avg",
+        "pv_perf_enquery_count_date_t_avg",
+    ),
+    "pv_growth_enquery_count_date_p2_vs_t_avg": (
+        "pv_perf_enquery_count_date_t_avg",
+        "pv_perf_enquery_count_date_p2_p1_avg",
+    ),
+}
+
+
+class TopHeader(TypedDict, total=False):
+    label: str
+    rowspan: int
+    colspan: int
+    column_index: int
+    end_column_index: int
+    separator_before: bool
+
+
+class MiddleHeader(TypedDict):
+    label: str
+    colspan: int
+    end_column_index: int
+    separator_before: bool
+    subgroup_separator_before: bool
+
+
+class DetailHeader(TypedDict):
+    full: str
+    short: str
+    narrow: bool
+    column_index: int
+
+
+@dataclass(slots=True)
+class GroupedHeadersBuildResult:
+    top_headers: list[TopHeader]
+    middle_headers: list[MiddleHeader]
+    detail_headers: list[DetailHeader]
+    metric_column_indexes: list[int]
+    narrow_metric_column_indexes: list[int]
+    pv_separator_index: int | None
+    subgroup_separator_indexes: list[int]
 
 
 @home_blueprint.route("/", methods=["GET"])
@@ -155,15 +210,14 @@ def download_formatted_report(report_id: str):
 
     filename, csv_content = download_file
     headers, rows = _parse_csv_content(csv_content)
-    (
-        top_headers,
-        middle_headers,
-        detail_headers,
-        _metric_column_indexes,
-        _narrow_metric_column_indexes,
-        _pv_separator_index,
-    ) = _build_grouped_headers(headers)
-    formatted_csv = _build_preview_csv_content(headers, rows, top_headers, middle_headers, detail_headers)
+    grouped_headers_result = _build_grouped_headers(headers)
+    formatted_csv = _build_preview_csv_content(
+        headers,
+        rows,
+        grouped_headers_result.top_headers,
+        grouped_headers_result.middle_headers,
+        grouped_headers_result.detail_headers,
+    )
     formatted_filename = _build_formatted_filename(filename)
 
     return send_file(
@@ -185,26 +239,26 @@ def view_report_table(report_id: str):
     filename, csv_content = download_file
     headers, rows = _parse_csv_content(csv_content)
     date_separator_index = headers.index("date") if "date" in headers else None
-    (
-        top_headers,
-        middle_headers,
-        detail_headers,
-        metric_column_indexes,
-        narrow_metric_column_indexes,
-        pv_separator_index,
-    ) = _build_grouped_headers(headers)
+    pv_growth_end_separator_index = (
+        headers.index("pv_growth_enquery_count_date_p2_vs_t_avg")
+        if "pv_growth_enquery_count_date_p2_vs_t_avg" in headers
+        else None
+    )
+    grouped_headers_result = _build_grouped_headers(headers)
     return render_template(
         "report_preview.html",
         report_id=report_id,
         filename=filename,
         headers=headers,
-        top_headers=top_headers,
-        middle_headers=middle_headers,
-        detail_headers=detail_headers,
-        metric_column_indexes=metric_column_indexes,
-        narrow_metric_column_indexes=narrow_metric_column_indexes,
+        top_headers=grouped_headers_result.top_headers,
+        middle_headers=grouped_headers_result.middle_headers,
+        detail_headers=grouped_headers_result.detail_headers,
+        metric_column_indexes=grouped_headers_result.metric_column_indexes,
+        narrow_metric_column_indexes=grouped_headers_result.narrow_metric_column_indexes,
         date_separator_index=date_separator_index,
-        pv_separator_index=pv_separator_index,
+        pv_separator_index=grouped_headers_result.pv_separator_index,
+        subgroup_separator_indexes=grouped_headers_result.subgroup_separator_indexes,
+        pv_growth_end_separator_index=pv_growth_end_separator_index,
         rows=rows,
         row_count=len(rows),
     )
@@ -267,12 +321,45 @@ def _parse_csv_content(csv_content: bytes) -> tuple[list[str], list[list[str]]]:
         normalized = [str(cell) for cell in row]
         if len(normalized) < column_count:
             normalized.extend([""] * (column_count - len(normalized)))
+
+        row_values_by_header = {
+            raw_headers[index]: normalized[index]
+            for index in range(column_count)
+        }
+        forced_empty_growth_headers = _growth_headers_to_blank(row_values_by_header)
+
         formatted_row = [
-            _format_table_cell(raw_headers[index], normalized[index])
+            "" if raw_headers[index] in forced_empty_growth_headers
+            else _format_table_cell(raw_headers[index], normalized[index])
             for index in range(column_count)
         ]
         table_rows.append(formatted_row)
     return headers, table_rows
+
+
+def _growth_headers_to_blank(row_values_by_header: dict[str, str]) -> set[str]:
+    """Return growth headers that should render as empty based on dependent zero values."""
+    blank_headers: set[str] = set()
+    for growth_header, dependency_headers in GROWTH_EMPTY_CONDITIONS.items():
+        first_dependency = row_values_by_header.get(dependency_headers[0], "")
+        second_dependency = row_values_by_header.get(dependency_headers[1], "")
+        if _is_zero_like(first_dependency) and _is_zero_like(second_dependency):
+            blank_headers.add(growth_header)
+    return blank_headers
+
+
+def _is_zero_like(value: str) -> bool:
+    """Return True when the value is a parseable numeric zero (optionally with % suffix)."""
+    normalized = value.strip()
+    if not normalized:
+        return True
+
+    numeric_text = normalized[:-1] if normalized.endswith("%") else normalized
+    try:
+        numeric_value = float(numeric_text)
+    except ValueError:
+        return False
+    return abs(numeric_value) < 1e-12
 
 
 def _format_table_cell(header_name: str, value: str) -> str:
@@ -301,16 +388,7 @@ def _display_header_label(header: str) -> str:
     return normalized
 
 
-def _build_grouped_headers(
-    headers: list[str],
-) -> tuple[
-    list[dict[str, int | str]],
-    list[dict[str, int | str]],
-    list[dict[str, str | bool]],
-    list[int],
-    list[int],
-    int | None,
-]:
+def _build_grouped_headers(headers: list[str]) -> GroupedHeadersBuildResult:
     """Build three-level header model: EV/PV -> subgroup -> detailed metric labels."""
     column_groups: dict[str, tuple[str, str, bool]] = {
         **{column: ("EV", "Enquiry", True) for column in EV_ENQUIRY_COLUMNS},
@@ -321,12 +399,13 @@ def _build_grouped_headers(
         **{column: ("PV", "Growth", False) for column in PV_GROWTH_COLUMNS},
     }
 
-    top_headers: list[dict[str, int | str]] = []
-    middle_headers: list[dict[str, int | str]] = []
-    detail_headers: list[dict[str, str | bool]] = []
+    top_headers: list[TopHeader] = []
+    middle_headers: list[MiddleHeader] = []
+    detail_headers: list[DetailHeader] = []
     metric_column_indexes: list[int] = []
     narrow_metric_column_indexes: list[int] = []
     pv_separator_index: int | None = None
+    subgroup_separator_indexes: list[int] = []
 
     index = 0
     while index < len(headers):
@@ -334,7 +413,14 @@ def _build_grouped_headers(
         group_info = column_groups.get(header)
 
         if group_info is None:
-            top_headers.append({"label": header, "rowspan": 3, "column_index": index})
+            top_headers.append(
+                {
+                    "label": header,
+                    "rowspan": 3,
+                    "column_index": index,
+                    "end_column_index": index,
+                }
+            )
             index += 1
             continue
 
@@ -366,6 +452,7 @@ def _build_grouped_headers(
                         "full": column_name,
                         "short": _compact_group_label(column_name),
                         "narrow": is_narrow,
+                        "column_index": index,
                     }
                 )
                 metric_column_indexes.append(index)
@@ -377,25 +464,32 @@ def _build_grouped_headers(
                 {
                     "label": subgroup_label,
                     "colspan": index - subgroup_start,
+                    "end_column_index": index - 1,
                     "separator_before": bool(family_label == "PV" and subgroup_start == family_start),
+                    "subgroup_separator_before": bool(subgroup_start != family_start),
                 }
             )
+
+            if subgroup_start != family_start:
+                subgroup_separator_indexes.append(subgroup_start)
 
         top_headers.append(
             {
                 "label": family_label,
                 "colspan": index - family_start,
+                "end_column_index": index - 1,
                 "separator_before": bool(family_label == "PV"),
             }
         )
 
-    return (
-        top_headers,
-        middle_headers,
-        detail_headers,
-        metric_column_indexes,
-        narrow_metric_column_indexes,
-        pv_separator_index,
+    return GroupedHeadersBuildResult(
+        top_headers=top_headers,
+        middle_headers=middle_headers,
+        detail_headers=detail_headers,
+        metric_column_indexes=metric_column_indexes,
+        narrow_metric_column_indexes=narrow_metric_column_indexes,
+        pv_separator_index=pv_separator_index,
+        subgroup_separator_indexes=subgroup_separator_indexes,
     )
 
 
@@ -433,9 +527,9 @@ def _compact_group_label(column_name: str) -> str:
 def _build_preview_csv_content(
     headers: list[str],
     rows: list[list[str]],
-    top_headers: list[dict[str, int | str]],
-    middle_headers: list[dict[str, int | str]],
-    detail_headers: list[dict[str, str | bool]],
+    top_headers: list[TopHeader],
+    middle_headers: list[MiddleHeader],
+    detail_headers: list[DetailHeader],
 ) -> bytes:
     """Build CSV bytes that mirror the currently rendered preview table."""
     buffer = StringIO()

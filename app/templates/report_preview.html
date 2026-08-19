@@ -31,8 +31,8 @@
           <tr class="header-top-row">
             {% for top_header in top_headers %}
             <th
-              {% if top_header.separator_before or (top_header.column_index is defined and date_separator_index is not none and top_header.column_index == date_separator_index) %}
-              class="{% if top_header.separator_before %}group-separator-left{% endif %}{% if top_header.separator_before and top_header.column_index is defined and date_separator_index is not none and top_header.column_index == date_separator_index %} {% endif %}{% if top_header.column_index is defined and date_separator_index is not none and top_header.column_index == date_separator_index %}date-separator-right{% endif %}"
+              {% if top_header.separator_before or (top_header.column_index is defined and date_separator_index is not none and top_header.column_index == date_separator_index) or (top_header.end_column_index is defined and pv_growth_end_separator_index is not none and top_header.end_column_index == pv_growth_end_separator_index) %}
+              class="{% if top_header.separator_before %}group-separator-left{% endif %}{% if top_header.separator_before and ((top_header.column_index is defined and date_separator_index is not none and top_header.column_index == date_separator_index) or (top_header.end_column_index is defined and pv_growth_end_separator_index is not none and top_header.end_column_index == pv_growth_end_separator_index)) %} {% endif %}{% if top_header.column_index is defined and date_separator_index is not none and top_header.column_index == date_separator_index %}date-separator-right{% endif %}{% if top_header.column_index is defined and date_separator_index is not none and top_header.column_index == date_separator_index and top_header.end_column_index is defined and pv_growth_end_separator_index is not none and top_header.end_column_index == pv_growth_end_separator_index %} {% endif %}{% if top_header.end_column_index is defined and pv_growth_end_separator_index is not none and top_header.end_column_index == pv_growth_end_separator_index %}terminal-separator-right{% endif %}"
               {% endif %}
               {% if top_header.rowspan is defined %}rowspan="{{ top_header.rowspan }}"{% endif %}
               {% if top_header.colspan is defined %}colspan="{{ top_header.colspan }}"{% endif %}
@@ -43,13 +43,18 @@
           </tr>
           <tr class="header-group-row">
             {% for header in middle_headers %}
-            <th{% if header.separator_before %} class="group-separator-left"{% endif %} colspan="{{ header.colspan }}">{{ header.label }}</th>
+            <th
+              {% if header.separator_before or header.subgroup_separator_before or (pv_growth_end_separator_index is not none and header.end_column_index == pv_growth_end_separator_index) %}
+              class="{% if header.separator_before %}group-separator-left{% endif %}{% if header.separator_before and (header.subgroup_separator_before or (pv_growth_end_separator_index is not none and header.end_column_index == pv_growth_end_separator_index)) %} {% endif %}{% if header.subgroup_separator_before %}subgroup-separator-left{% endif %}{% if header.subgroup_separator_before and pv_growth_end_separator_index is not none and header.end_column_index == pv_growth_end_separator_index %} {% endif %}{% if pv_growth_end_separator_index is not none and header.end_column_index == pv_growth_end_separator_index %}terminal-separator-right{% endif %}"
+              {% endif %}
+              colspan="{{ header.colspan }}"
+            >{{ header.label }}</th>
             {% endfor %}
           </tr>
           <tr class="header-detail-row">
             {% for header in detail_headers %}
             <th
-              class="{% if header.narrow %}narrow-metric-col {% endif %}{% if pv_separator_index is not none and loop.index0 == pv_separator_index %}group-separator-left{% endif %}"
+              class="{% if header.narrow %}narrow-metric-col {% endif %}{% if pv_separator_index is not none and header.column_index == pv_separator_index %}group-separator-left{% endif %}{% if subgroup_separator_indexes and header.column_index in subgroup_separator_indexes %} subgroup-separator-left{% endif %}{% if pv_growth_end_separator_index is not none and header.column_index == pv_growth_end_separator_index %} terminal-separator-right{% endif %}"
               title="{{ header.full }}"
             >{{ header.short }}</th>
             {% endfor %}
@@ -67,8 +72,8 @@
           <tr>
             {% for value in row %}
             <td
-              {% if loop.index0 in metric_column_indexes or (pv_separator_index is not none and loop.index0 == pv_separator_index) or (date_separator_index is not none and loop.index0 == date_separator_index) %}
-              class="{% if loop.index0 in metric_column_indexes %}metric-cell{% endif %}{% if loop.index0 in narrow_metric_column_indexes %} narrow-metric-col{% endif %}{% if pv_separator_index is not none and loop.index0 == pv_separator_index %} group-separator-left{% endif %}{% if date_separator_index is not none and loop.index0 == date_separator_index %} date-separator-right{% endif %}"
+              {% if loop.index0 in metric_column_indexes or (pv_separator_index is not none and loop.index0 == pv_separator_index) or (date_separator_index is not none and loop.index0 == date_separator_index) or (subgroup_separator_indexes and loop.index0 in subgroup_separator_indexes) or (pv_growth_end_separator_index is not none and loop.index0 == pv_growth_end_separator_index) %}
+              class="{% if loop.index0 in metric_column_indexes %}metric-cell{% endif %}{% if loop.index0 in narrow_metric_column_indexes %} narrow-metric-col{% endif %}{% if pv_separator_index is not none and loop.index0 == pv_separator_index %} group-separator-left{% endif %}{% if subgroup_separator_indexes and loop.index0 in subgroup_separator_indexes %} subgroup-separator-left{% endif %}{% if date_separator_index is not none and loop.index0 == date_separator_index %} date-separator-right{% endif %}{% if pv_growth_end_separator_index is not none and loop.index0 == pv_growth_end_separator_index %} terminal-separator-right{% endif %}"
               {% endif %}
             >{{ value }}</td>
             {% endfor %}
