@@ -30,6 +30,15 @@ EV_ENQUIRY_COLUMNS = [
     "ev_enquery_count_date_p1",
     "ev_enquery_count_date_p2",
 ]
+EV_PERFORMANCE_COLUMNS = [
+    "ev_perf_enquery_count_date_m2_m1_avg",
+    "ev_perf_enquery_count_date_t_avg",
+    "ev_perf_enquery_count_date_p2_p1_avg",
+]
+EV_GROWTH_COLUMNS = [
+    "ev_growth_enquery_count_date_t_vs_m2_avg",
+    "ev_growth_enquery_count_date_p2_vs_t_avg",
+]
 PV_ENQUIRY_COLUMNS = [
     "pv_enquery_count_date_m2",
     "pv_enquery_count_date_m1",
@@ -37,6 +46,16 @@ PV_ENQUIRY_COLUMNS = [
     "pv_enquery_count_date_p1",
     "pv_enquery_count_date_p2",
 ]
+PV_PERFORMANCE_COLUMNS = [
+    "pv_perf_enquery_count_date_m2_m1_avg",
+    "pv_perf_enquery_count_date_t_avg",
+    "pv_perf_enquery_count_date_p2_p1_avg",
+]
+PV_GROWTH_COLUMNS = [
+    "pv_growth_enquery_count_date_t_vs_m2_avg",
+    "pv_growth_enquery_count_date_p2_vs_t_avg",
+]
+PERCENTAGE_FORMAT_COLUMNS = set(EV_GROWTH_COLUMNS + PV_GROWTH_COLUMNS)
 
 
 @home_blueprint.route("/", methods=["GET"])
@@ -136,8 +155,15 @@ def download_formatted_report(report_id: str):
 
     filename, csv_content = download_file
     headers, rows = _parse_csv_content(csv_content)
-    top_headers, grouped_headers, _metric_column_indexes = _build_grouped_headers(headers)
-    formatted_csv = _build_preview_csv_content(headers, rows, top_headers, grouped_headers)
+    (
+        top_headers,
+        middle_headers,
+        detail_headers,
+        _metric_column_indexes,
+        _narrow_metric_column_indexes,
+        _pv_separator_index,
+    ) = _build_grouped_headers(headers)
+    formatted_csv = _build_preview_csv_content(headers, rows, top_headers, middle_headers, detail_headers)
     formatted_filename = _build_formatted_filename(filename)
 
     return send_file(
@@ -158,15 +184,27 @@ def view_report_table(report_id: str):
 
     filename, csv_content = download_file
     headers, rows = _parse_csv_content(csv_content)
-    top_headers, grouped_headers, metric_column_indexes = _build_grouped_headers(headers)
+    date_separator_index = headers.index("date") if "date" in headers else None
+    (
+        top_headers,
+        middle_headers,
+        detail_headers,
+        metric_column_indexes,
+        narrow_metric_column_indexes,
+        pv_separator_index,
+    ) = _build_grouped_headers(headers)
     return render_template(
         "report_preview.html",
         report_id=report_id,
         filename=filename,
         headers=headers,
         top_headers=top_headers,
-        grouped_headers=grouped_headers,
+        middle_headers=middle_headers,
+        detail_headers=detail_headers,
         metric_column_indexes=metric_column_indexes,
+        narrow_metric_column_indexes=narrow_metric_column_indexes,
+        date_separator_index=date_separator_index,
+        pv_separator_index=pv_separator_index,
         rows=rows,
         row_count=len(rows),
     )
@@ -221,15 +259,38 @@ def _parse_csv_content(csv_content: bytes) -> tuple[list[str], list[list[str]]]:
     if not parsed_rows:
         return [], []
 
-    headers = [_display_header_label(str(column)) for column in parsed_rows[0]]
+    raw_headers = [str(column).strip() for column in parsed_rows[0]]
+    headers = [_display_header_label(column) for column in raw_headers]
     column_count = len(headers)
     table_rows: list[list[str]] = []
     for row in parsed_rows[1:]:
         normalized = [str(cell) for cell in row]
         if len(normalized) < column_count:
             normalized.extend([""] * (column_count - len(normalized)))
-        table_rows.append(normalized[:column_count])
+        formatted_row = [
+            _format_table_cell(raw_headers[index], normalized[index])
+            for index in range(column_count)
+        ]
+        table_rows.append(formatted_row)
     return headers, table_rows
+
+
+def _format_table_cell(header_name: str, value: str) -> str:
+    """Apply display formatting rules for preview table cells by column name."""
+    if header_name not in PERCENTAGE_FORMAT_COLUMNS:
+        return value
+
+    normalized = value.strip()
+    if not normalized:
+        return value
+
+    numeric_text = normalized[:-1] if normalized.endswith("%") else normalized
+    try:
+        numeric_value = float(numeric_text)
+    except ValueError:
+        return value
+
+    return f"{numeric_value:.2f}%"
 
 
 def _display_header_label(header: str) -> str:
@@ -242,54 +303,119 @@ def _display_header_label(header: str) -> str:
 
 def _build_grouped_headers(
     headers: list[str],
-) -> tuple[list[dict[str, int | str]], list[dict[str, str]], list[int]]:
-    """Build two-level header model that groups EV/PV enquiry date columns."""
-    ev_set = set(EV_ENQUIRY_COLUMNS)
-    pv_set = set(PV_ENQUIRY_COLUMNS)
+) -> tuple[
+    list[dict[str, int | str]],
+    list[dict[str, int | str]],
+    list[dict[str, str | bool]],
+    list[int],
+    list[int],
+    int | None,
+]:
+    """Build three-level header model: EV/PV -> subgroup -> detailed metric labels."""
+    column_groups: dict[str, tuple[str, str, bool]] = {
+        **{column: ("EV", "Enquiry", True) for column in EV_ENQUIRY_COLUMNS},
+        **{column: ("EV", "Performance", False) for column in EV_PERFORMANCE_COLUMNS},
+        **{column: ("EV", "Growth", False) for column in EV_GROWTH_COLUMNS},
+        **{column: ("PV", "Enquiry", True) for column in PV_ENQUIRY_COLUMNS},
+        **{column: ("PV", "Performance", False) for column in PV_PERFORMANCE_COLUMNS},
+        **{column: ("PV", "Growth", False) for column in PV_GROWTH_COLUMNS},
+    }
+
     top_headers: list[dict[str, int | str]] = []
-    grouped_headers: list[dict[str, str]] = []
+    middle_headers: list[dict[str, int | str]] = []
+    detail_headers: list[dict[str, str | bool]] = []
     metric_column_indexes: list[int] = []
+    narrow_metric_column_indexes: list[int] = []
+    pv_separator_index: int | None = None
 
     index = 0
     while index < len(headers):
         header = headers[index]
+        group_info = column_groups.get(header)
 
-        if header in ev_set:
-            span_headers: list[str] = []
-            start_index = index
-            while index < len(headers) and headers[index] in ev_set:
-                span_headers.append(headers[index])
-                index += 1
-            top_headers.append({"label": "EV Enquiry", "colspan": len(span_headers)})
-            grouped_headers.extend(
-                {"full": column_name, "short": _compact_group_label(column_name)}
-                for column_name in span_headers
-            )
-            metric_column_indexes.extend(range(start_index, index))
+        if group_info is None:
+            top_headers.append({"label": header, "rowspan": 3, "column_index": index})
+            index += 1
             continue
 
-        if header in pv_set:
-            span_headers = []
-            start_index = index
-            while index < len(headers) and headers[index] in pv_set:
-                span_headers.append(headers[index])
+        family_label = group_info[0]
+        family_start = index
+        if family_label == "PV" and pv_separator_index is None:
+            pv_separator_index = family_start
+        while index < len(headers):
+            current_info = column_groups.get(headers[index])
+            if current_info is None or current_info[0] != family_label:
+                break
+
+            subgroup_label = current_info[1]
+            subgroup_start = index
+
+            while index < len(headers):
+                subgroup_info = column_groups.get(headers[index])
+                if (
+                    subgroup_info is None
+                    or subgroup_info[0] != family_label
+                    or subgroup_info[1] != subgroup_label
+                ):
+                    break
+
+                column_name = headers[index]
+                is_narrow = bool(subgroup_info[2])
+                detail_headers.append(
+                    {
+                        "full": column_name,
+                        "short": _compact_group_label(column_name),
+                        "narrow": is_narrow,
+                    }
+                )
+                metric_column_indexes.append(index)
+                if is_narrow:
+                    narrow_metric_column_indexes.append(index)
                 index += 1
-            top_headers.append({"label": "PV Enquiry", "colspan": len(span_headers)})
-            grouped_headers.extend(
-                {"full": column_name, "short": _compact_group_label(column_name)}
-                for column_name in span_headers
+
+            middle_headers.append(
+                {
+                    "label": subgroup_label,
+                    "colspan": index - subgroup_start,
+                    "separator_before": bool(family_label == "PV" and subgroup_start == family_start),
+                }
             )
-            metric_column_indexes.extend(range(start_index, index))
-            continue
 
-        top_headers.append({"label": header, "rowspan": 2})
-        index += 1
+        top_headers.append(
+            {
+                "label": family_label,
+                "colspan": index - family_start,
+                "separator_before": bool(family_label == "PV"),
+            }
+        )
 
-    return top_headers, grouped_headers, metric_column_indexes
+    return (
+        top_headers,
+        middle_headers,
+        detail_headers,
+        metric_column_indexes,
+        narrow_metric_column_indexes,
+        pv_separator_index,
+    )
 
 
 def _compact_group_label(column_name: str) -> str:
     """Return short display labels for grouped date-offset columns."""
+    explicit_labels = {
+        "ev_perf_enquery_count_date_m2_m1_avg": "Avg T-2, T-1",
+        "ev_perf_enquery_count_date_t_avg": "T",
+        "ev_perf_enquery_count_date_p2_p1_avg": "Avg T+1, T+2",
+        "ev_growth_enquery_count_date_t_vs_m2_avg": "Avg T-1,T-2 vs T",
+        "ev_growth_enquery_count_date_p2_vs_t_avg": "Avg T+1, T+2 vs T",
+        "pv_perf_enquery_count_date_m2_m1_avg": "Avg T-2, T-1",
+        "pv_perf_enquery_count_date_t_avg": "T",
+        "pv_perf_enquery_count_date_p2_p1_avg": "Avg T+1, T+2",
+        "pv_growth_enquery_count_date_t_vs_m2_avg": "Avg T-1,T-2 vs T",
+        "pv_growth_enquery_count_date_p2_vs_t_avg": "Avg T+1, T+2 vs T",
+    }
+    if column_name in explicit_labels:
+        return explicit_labels[column_name]
+
     suffix = column_name.rsplit("_", maxsplit=1)[-1].lower()
     if suffix == "m2":
         return "T-2"
@@ -308,36 +434,57 @@ def _build_preview_csv_content(
     headers: list[str],
     rows: list[list[str]],
     top_headers: list[dict[str, int | str]],
-    grouped_headers: list[dict[str, str]],
+    middle_headers: list[dict[str, int | str]],
+    detail_headers: list[dict[str, str | bool]],
 ) -> bytes:
     """Build CSV bytes that mirror the currently rendered preview table."""
     buffer = StringIO()
     writer = csv.writer(buffer)
 
-    if grouped_headers:
+    if detail_headers:
         first_row: list[str] = []
         second_row: list[str] = []
-        grouped_index = 0
+        third_row: list[str] = []
+        middle_index = 0
+        detail_index = 0
 
         for top_header in top_headers:
             label = str(top_header.get("label", ""))
             if "rowspan" in top_header:
                 first_row.append(label)
                 second_row.append("")
+                third_row.append("")
                 continue
 
             colspan = int(top_header.get("colspan", 1))
             first_row.append(label)
             first_row.extend([""] * max(0, colspan - 1))
-            for _ in range(colspan):
-                if grouped_index < len(grouped_headers):
-                    second_row.append(str(grouped_headers[grouped_index].get("short", "")))
+            remaining = colspan
+            while remaining > 0:
+                if middle_index < len(middle_headers):
+                    middle_header = middle_headers[middle_index]
+                    middle_label = str(middle_header.get("label", ""))
+                    middle_colspan = int(middle_header.get("colspan", 1))
                 else:
-                    second_row.append("")
-                grouped_index += 1
+                    middle_label = ""
+                    middle_colspan = 1
+
+                second_row.append(middle_label)
+                second_row.extend([""] * max(0, middle_colspan - 1))
+
+                for _ in range(middle_colspan):
+                    if detail_index < len(detail_headers):
+                        third_row.append(str(detail_headers[detail_index].get("short", "")))
+                    else:
+                        third_row.append("")
+                    detail_index += 1
+
+                middle_index += 1
+                remaining -= middle_colspan
 
         writer.writerow(first_row)
         writer.writerow(second_row)
+        writer.writerow(third_row)
     else:
         writer.writerow(headers)
 

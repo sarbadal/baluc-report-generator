@@ -27,10 +27,13 @@
     <div class="table-wrap{% if row_count > 10 %} is-scrollable{% endif %}">
       <table>
         <thead>
-          {% if grouped_headers %}
-          <tr class="header-group-row">
+          {% if detail_headers %}
+          <tr class="header-top-row">
             {% for top_header in top_headers %}
             <th
+              {% if top_header.separator_before or (top_header.column_index is defined and date_separator_index is not none and top_header.column_index == date_separator_index) %}
+              class="{% if top_header.separator_before %}group-separator-left{% endif %}{% if top_header.separator_before and top_header.column_index is defined and date_separator_index is not none and top_header.column_index == date_separator_index %} {% endif %}{% if top_header.column_index is defined and date_separator_index is not none and top_header.column_index == date_separator_index %}date-separator-right{% endif %}"
+              {% endif %}
               {% if top_header.rowspan is defined %}rowspan="{{ top_header.rowspan }}"{% endif %}
               {% if top_header.colspan is defined %}colspan="{{ top_header.colspan }}"{% endif %}
             >
@@ -38,15 +41,23 @@
             </th>
             {% endfor %}
           </tr>
+          <tr class="header-group-row">
+            {% for header in middle_headers %}
+            <th{% if header.separator_before %} class="group-separator-left"{% endif %} colspan="{{ header.colspan }}">{{ header.label }}</th>
+            {% endfor %}
+          </tr>
           <tr class="header-detail-row">
-            {% for header in grouped_headers %}
-            <th title="{{ header.full }}">{{ header.short }}</th>
+            {% for header in detail_headers %}
+            <th
+              class="{% if header.narrow %}narrow-metric-col {% endif %}{% if pv_separator_index is not none and loop.index0 == pv_separator_index %}group-separator-left{% endif %}"
+              title="{{ header.full }}"
+            >{{ header.short }}</th>
             {% endfor %}
           </tr>
           {% else %}
           <tr>
             {% for header in headers %}
-            <th>{{ header }}</th>
+            <th{% if date_separator_index is not none and loop.index0 == date_separator_index %} class="date-separator-right"{% endif %}>{{ header }}</th>
             {% endfor %}
           </tr>
           {% endif %}
@@ -55,7 +66,11 @@
           {% for row in rows %}
           <tr>
             {% for value in row %}
-            <td{% if loop.index0 in metric_column_indexes %} class="metric-cell"{% endif %}>{{ value }}</td>
+            <td
+              {% if loop.index0 in metric_column_indexes or (pv_separator_index is not none and loop.index0 == pv_separator_index) or (date_separator_index is not none and loop.index0 == date_separator_index) %}
+              class="{% if loop.index0 in metric_column_indexes %}metric-cell{% endif %}{% if loop.index0 in narrow_metric_column_indexes %} narrow-metric-col{% endif %}{% if pv_separator_index is not none and loop.index0 == pv_separator_index %} group-separator-left{% endif %}{% if date_separator_index is not none and loop.index0 == date_separator_index %} date-separator-right{% endif %}"
+              {% endif %}
+            >{{ value }}</td>
             {% endfor %}
           </tr>
           {% endfor %}
