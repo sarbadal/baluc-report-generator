@@ -65,6 +65,7 @@ _load_selected_env_keys(
     {
         "APP_ENV",
         "ENV_TYPE",
+        "APP_PASSWORD",
         "REPORT_TRIGGER_FUNCTION_URL",
         "REPORT_TRIGGER_TIMEOUT_SECONDS",
         "REPORT_TRIGGER_AUTH_TOKEN",
@@ -74,6 +75,7 @@ _load_selected_env_keys(
     },
 )
 
+from app.blueprints.auth import register_app_password_gate
 from app.blueprints import register_blueprints
 from app.config import get_config
 from app.core.logging import configure_logging
@@ -167,6 +169,7 @@ def create_app(config_object: str | None = None) -> Flask:
     )
 
     register_blueprints(app)
+    register_app_password_gate(app)
 
     def static_asset(filename: str) -> str:
         """Resolve static asset URL from local static in dev, GCS in prod."""
@@ -183,6 +186,7 @@ def create_app(config_object: str | None = None) -> Flask:
         return {
             "current_year": datetime.now(IST_TZ).year,
             "static_asset": static_asset,
+            "app_password_enabled": bool(str(app.config.get("APP_PASSWORD", "")).strip()),
         }
 
     return app

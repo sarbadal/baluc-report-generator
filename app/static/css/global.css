@@ -102,6 +102,15 @@ body {
   border-bottom-color: var(--nav-border);
 }
 
+.app-nav-form {
+  margin: 0;
+}
+
+.app-nav-button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
 .app-nav-link.is-active,
 .app-nav-link[aria-current="page"] {
   color: var(--brand-color);

@@ -73,6 +73,7 @@ Core app/runtime variables:
 
 - APP_ENV
 - SECRET_KEY
+- APP_PASSWORD (optional; enables app-level password protection when set)
 - REPORT_STORAGE_BACKEND
 - REPORT_STORAGE_BUCKET_NAME
 - REPORT_STORAGE_METADATA_OBJECT
@@ -87,6 +88,8 @@ Core app/runtime variables:
 
 Notes:
 
+- Set `APP_PASSWORD` to require a password before users can access app pages. Leave it blank or unset to disable the password gate.
+- Use a strong `SECRET_KEY` whenever `APP_PASSWORD` is enabled, because authenticated sessions are stored in Flask's signed session cookie.
 - The Flask app triggers report generation via `REPORT_TRIGGER_FUNCTION_URL`.
 - The trigger target can be any external HTTP service (for example, a separately deployed `process_in_bq` function).
 - Flask has no import/runtime dependency on the `process_in_bq` folder being present in this repository.
@@ -121,6 +124,7 @@ Recommended deployment env file example (deploy.env):
 	DEPLOY_ALLOW_UNAUTHENTICATED=false
 	APP_ENV=production
 	SECRET_KEY=replace-with-strong-secret
+	APP_PASSWORD=replace-with-app-password
 	REPORT_STORAGE_BACKEND=gcs
 	REPORT_STORAGE_BUCKET_NAME=your-report-storage-bucket
 

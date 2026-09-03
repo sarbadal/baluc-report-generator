@@ -4,6 +4,11 @@
     <nav class="app-nav" aria-label="Primary">
       <a class="app-nav-link{% if request.endpoint == 'home.home' %} is-active{% endif %}" href="{{ url_for('home.home') }}" {% if request.endpoint == 'home.home' %}aria-current="page"{% endif %}>Home</a>
       <a class="app-nav-link{% if request.endpoint == 'home.report_generator_page' %} is-active{% endif %}" href="{{ url_for('home.report_generator_page') }}" {% if request.endpoint == 'home.report_generator_page' %}aria-current="page"{% endif %}>Report Generator</a>
+      {% if app_password_enabled and session.get('app_password_authenticated') %}
+        <form class="app-nav-form" method="post" action="{{ url_for('auth.logout') }}">
+          <button class="app-nav-link app-nav-button" type="submit">Logout</button>
+        </form>
+      {% endif %}
       <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Toggle dark and light theme">
         <span class="theme-toggle-label" id="theme-toggle-label">Dark</span>
       </button>

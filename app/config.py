@@ -152,6 +152,7 @@ class BaseConfig:
     SECRET_KEY = os.getenv("SECRET_KEY")
     if not SECRET_KEY:
         SECRET_KEY = "change-me-in-production"
+    APP_PASSWORD = os.getenv("APP_PASSWORD", "").strip()
 
 
 class DevelopmentConfig(BaseConfig):

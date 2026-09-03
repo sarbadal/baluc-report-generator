@@ -20,7 +20,7 @@
     <link rel="stylesheet" href="{{ static_asset('css/global.css') }}" />
     {% block styles %}{% endblock %}
   </head>
-  <body>
+  <body class="{% block body_class %}{% endblock %}">
     {% include "components/global/header.html" %}
     <div class="app-main">{% block body %}{% endblock %}</div>
     {% include "components/global/footer.html" %}
