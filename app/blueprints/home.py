@@ -314,7 +314,8 @@ def _parse_csv_content(csv_content: bytes) -> tuple[list[str], list[list[str]]]:
         return [], []
 
     raw_headers = [str(column).strip() for column in parsed_rows[0]]
-    headers = [_display_header_label(column) for column in raw_headers]
+    normalized_headers = [_normalize_column_name(column) for column in raw_headers]
+    headers = [_display_header_label(column) for column in normalized_headers]
     column_count = len(headers)
     table_rows: list[list[str]] = []
     for row in parsed_rows[1:]:
@@ -323,14 +324,14 @@ def _parse_csv_content(csv_content: bytes) -> tuple[list[str], list[list[str]]]:
             normalized.extend([""] * (column_count - len(normalized)))
 
         row_values_by_header = {
-            raw_headers[index]: normalized[index]
+            normalized_headers[index]: normalized[index]
             for index in range(column_count)
         }
         forced_empty_growth_headers = _growth_headers_to_blank(row_values_by_header)
 
         formatted_row = [
-            "" if raw_headers[index] in forced_empty_growth_headers
-            else _format_table_cell(raw_headers[index], normalized[index])
+            "" if normalized_headers[index] in forced_empty_growth_headers
+            else _format_table_cell(normalized_headers[index], normalized[index])
             for index in range(column_count)
         ]
         table_rows.append(formatted_row)
@@ -380,16 +381,37 @@ def _format_table_cell(header_name: str, value: str) -> str:
     return f"{numeric_value:.2f}%"
 
 
+def _normalize_column_name(header: str) -> str:
+    """Normalize prefixed aliases like EVC/PVC to the EV/PV naming conventions used in report previews."""
+    normalized = header.strip()
+    return normalized.replace("evc_", "ev_").replace("pvc_", "pv_")
+
+
 def _display_header_label(header: str) -> str:
     """Map internal CSV headers to user-friendly display labels for preview table."""
-    normalized = header.strip()
+    normalized = _normalize_column_name(header)
     if normalized in {"pub_name", "publication_original"}:
         return "publication original"
     return normalized
 
 
+def _display_group_family_label(family_label: str, existing_top_headers: list[TopHeader]) -> str:
+    """Return report-friendly top header labels for EV/PV family sections."""
+    has_ev = any((header.get("label") or "").startswith("EV") for header in existing_top_headers)
+    has_pv = any((header.get("label") or "").startswith("PV") for header in existing_top_headers)
+
+    if family_label == "EV":
+        if has_ev and has_pv:
+            return "EV/PV"
+        return "EV(All Captions)"
+    if family_label == "PV":
+        return "PV(All Captions)"
+    return family_label
+
+
 def _build_grouped_headers(headers: list[str]) -> GroupedHeadersBuildResult:
     """Build three-level header model: EV/PV -> subgroup -> detailed metric labels."""
+    normalized_headers = [_normalize_column_name(header) for header in headers]
     column_groups: dict[str, tuple[str, str, bool]] = {
         **{column: ("EV", "Enquiry", True) for column in EV_ENQUIRY_COLUMNS},
         **{column: ("EV", "Performance", False) for column in EV_PERFORMANCE_COLUMNS},
@@ -408,8 +430,8 @@ def _build_grouped_headers(headers: list[str]) -> GroupedHeadersBuildResult:
     subgroup_separator_indexes: list[int] = []
 
     index = 0
-    while index < len(headers):
-        header = headers[index]
+    while index < len(normalized_headers):
+        header = normalized_headers[index]
         group_info = column_groups.get(header)
 
         if group_info is None:
@@ -428,16 +450,16 @@ def _build_grouped_headers(headers: list[str]) -> GroupedHeadersBuildResult:
         family_start = index
         if family_label == "PV" and pv_separator_index is None:
             pv_separator_index = family_start
-        while index < len(headers):
-            current_info = column_groups.get(headers[index])
+        while index < len(normalized_headers):
+            current_info = column_groups.get(normalized_headers[index])
             if current_info is None or current_info[0] != family_label:
                 break
 
             subgroup_label = current_info[1]
             subgroup_start = index
 
-            while index < len(headers):
-                subgroup_info = column_groups.get(headers[index])
+            while index < len(normalized_headers):
+                subgroup_info = column_groups.get(normalized_headers[index])
                 if (
                     subgroup_info is None
                     or subgroup_info[0] != family_label
@@ -445,7 +467,7 @@ def _build_grouped_headers(headers: list[str]) -> GroupedHeadersBuildResult:
                 ):
                     break
 
-                column_name = headers[index]
+                column_name = normalized_headers[index]
                 is_narrow = bool(subgroup_info[2])
                 detail_headers.append(
                     {
@@ -475,7 +497,7 @@ def _build_grouped_headers(headers: list[str]) -> GroupedHeadersBuildResult:
 
         top_headers.append(
             {
-                "label": family_label,
+                "label": _display_group_family_label(family_label, top_headers),
                 "colspan": index - family_start,
                 "end_column_index": index - 1,
                 "separator_before": bool(family_label == "PV"),
@@ -495,6 +517,7 @@ def _build_grouped_headers(headers: list[str]) -> GroupedHeadersBuildResult:
 
 def _compact_group_label(column_name: str) -> str:
     """Return short display labels for grouped date-offset columns."""
+    normalized_column_name = _normalize_column_name(column_name)
     explicit_labels = {
         "ev_perf_enquery_count_date_m2_m1_avg": "Avg T-2, T-1",
         "ev_perf_enquery_count_date_t_avg": "T",
@@ -507,10 +530,10 @@ def _compact_group_label(column_name: str) -> str:
         "pv_growth_enquery_count_date_t_vs_m2_avg": "Avg T-1,T-2 vs T",
         "pv_growth_enquery_count_date_p2_vs_t_avg": "Avg T+1, T+2 vs T",
     }
-    if column_name in explicit_labels:
-        return explicit_labels[column_name]
+    if normalized_column_name in explicit_labels:
+        return explicit_labels[normalized_column_name]
 
-    suffix = column_name.rsplit("_", maxsplit=1)[-1].lower()
+    suffix = normalized_column_name.rsplit("_", maxsplit=1)[-1].lower()
     if suffix == "m2":
         return "T-2"
     if suffix == "m1":

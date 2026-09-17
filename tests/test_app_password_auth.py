@@ -7,6 +7,7 @@ from flask import Flask
 
 from app.blueprints.auth import auth_blueprint
 from app.blueprints.auth import register_app_password_gate
+from app.blueprints.home import _build_grouped_headers
 
 
 def _make_app(app_password: str = "secret") -> Flask:
@@ -80,3 +81,27 @@ def test_password_gate_is_disabled_when_env_password_is_blank() -> None:
 
     assert response.status_code == 200
     assert response.data == b"home"
+
+
+def test_grouped_headers_recognize_evc_columns_as_ev_metrics() -> None:
+    headers = [
+        "date",
+        "evc_enquery_count_date_m2",
+        "evc_enquery_count_date_m1",
+        "evc_enquery_count_date_t",
+        "evc_enquery_count_date_p1",
+        "evc_enquery_count_date_p2",
+        "evc_perf_enquery_count_date_m2_m1_avg",
+        "evc_perf_enquery_count_date_t_avg",
+        "evc_perf_enquery_count_date_p2_p1_avg",
+        "evc_growth_enquery_count_date_t_vs_m2_avg",
+        "evc_growth_enquery_count_date_p2_vs_t_avg",
+    ]
+
+    grouped = _build_grouped_headers(headers)
+
+    assert grouped.top_headers[0]["label"] == "EV"
+    assert grouped.middle_headers[0]["label"] == "Enquiry"
+    assert grouped.detail_headers[0]["full"] == "evc_enquery_count_date_m2"
+    assert grouped.detail_headers[0]["short"] == "T-2"
+    assert grouped.detail_headers[-1]["short"] == "Avg T+1, T+2 vs T"
