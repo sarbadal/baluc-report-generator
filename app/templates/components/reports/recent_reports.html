@@ -30,6 +30,7 @@
       <span class="badge {{ report.status | lower }}">{{ report.status }}</span>
       {% if report.status == "Completed" %}
       <a class="view-report" href="{{ url_for('home.view_report_table', report_id=report.report_id) }}">View Report</a>
+      <a class="view-report" href="{{ url_for('home.view_report_set', report_id=report.report_id) }}">ReportSet</a>
       <a class="download" href="{{ url_for('home.download_report', report_id=report.report_id) }}">CSV</a>
       {% else %}
       <span class="job-meta dash">-</span>

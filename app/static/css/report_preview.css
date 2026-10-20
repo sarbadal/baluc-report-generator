@@ -223,3 +223,34 @@ tbody tr:nth-child(even) {
     flex-wrap: wrap;
   }
 }
+
+.meta-strong {
+  color: var(--preview-ink);
+  font-weight: 700;
+}
+
+.reportset-table-wrap thead th {
+  top: 0;
+}
+
+.reportset-table-wrap.is-scrollable {
+  min-height: 0;
+}
+
+.reportset-table td {
+  vertical-align: middle;
+}
+
+.reportset-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.reportset-actions .btn {
+  padding: 3px 10px;
+  font-size: 11px;
+}
+
+.reportset-table {
+  width: 100%;
+}

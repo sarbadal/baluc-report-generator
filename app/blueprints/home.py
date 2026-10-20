@@ -10,7 +10,10 @@ from io import BytesIO
 from io import StringIO
 import os
 from typing import TypedDict
+import zipfile
 from zoneinfo import ZoneInfo
+
+import pandas as pd
 
 from flask import abort
 from flask import Blueprint
@@ -21,6 +24,9 @@ from flask import render_template
 from flask import request
 from flask import send_file
 from flask import url_for
+
+from app.report_factory.report_set import get_report_set_reports
+from app.report_factory.report_set import load_base_report_dataframe
 
 home_blueprint = Blueprint("home", __name__)
 RECENT_REPORTS_LIMIT = 10
@@ -210,18 +216,10 @@ def download_formatted_report(report_id: str):
 
     filename, csv_content = download_file
     headers, rows = _parse_csv_content(csv_content)
-    grouped_headers_result = _build_grouped_headers(headers)
-    formatted_csv = _build_preview_csv_content(
-        headers,
-        rows,
-        grouped_headers_result.top_headers,
-        grouped_headers_result.middle_headers,
-        grouped_headers_result.detail_headers,
-    )
     formatted_filename = _build_formatted_filename(filename)
 
     return send_file(
-        BytesIO(formatted_csv),
+        BytesIO(_build_formatted_csv(headers, rows)),
         as_attachment=True,
         download_name=formatted_filename,
         mimetype="text/csv",
@@ -238,6 +236,110 @@ def view_report_table(report_id: str):
 
     filename, csv_content = download_file
     headers, rows = _parse_csv_content(csv_content)
+    return _render_report_preview(
+        report_id=report_id,
+        filename=filename,
+        headers=headers,
+        rows=rows,
+        download_url=url_for("home.download_formatted_report", report_id=report_id),
+    )
+
+
+@home_blueprint.route("/reports/<report_id>/reportset", methods=["GET"])
+def view_report_set(report_id: str):
+    """List predefined reports built from the same base DataFrame."""
+    filename, base_df = _load_report_dataframe(report_id)
+    report_set_items: list[dict[str, object]] = []
+    for report_key, (label, build_dataframe) in get_report_set_reports(base_df).items():
+        report_df = build_dataframe(base_df)
+        report_set_items.append(
+            {
+                "label": label,
+                "row_count": len(report_df),
+                "view_url": url_for(
+                    "home.view_report_set_item", report_id=report_id, report=report_key
+                ),
+                "download_url": url_for(
+                    "home.download_report_set_item", report_id=report_id, report=report_key
+                ),
+            }
+        )
+
+    return render_template(
+        "report_set.html",
+        report_id=report_id,
+        filename=filename,
+        total_row_count=len(base_df),
+        report_set_items=report_set_items,
+    )
+
+
+@home_blueprint.route("/reports/<report_id>/reportset/view", methods=["GET"])
+def view_report_set_item(report_id: str):
+    """Render a single derived report from the report set as an HTML table."""
+    filename, report_df, report_key, label = _load_report_set_item(report_id)
+    headers, rows = _dataframe_preview_table(report_df)
+    return _render_report_preview(
+        report_id=report_id,
+        filename=_build_report_set_filename(filename, report_key),
+        headers=headers,
+        rows=rows,
+        download_url=url_for(
+            "home.download_report_set_item", report_id=report_id, report=report_key
+        ),
+        back_url=url_for("home.view_report_set", report_id=report_id),
+        back_label="Back to Report Set",
+        subtitle=label,
+    )
+
+
+@home_blueprint.route("/reports/<report_id>/reportset/download", methods=["GET"])
+def download_report_set_item(report_id: str):
+    """Download a single derived report from the report set as formatted CSV."""
+    filename, report_df, report_key, _ = _load_report_set_item(report_id)
+    headers, rows = _dataframe_preview_table(report_df)
+    return send_file(
+        BytesIO(_build_formatted_csv(headers, rows)),
+        as_attachment=True,
+        download_name=_build_report_set_filename(filename, report_key),
+        mimetype="text/csv",
+    )
+
+
+@home_blueprint.route("/reports/<report_id>/reportset/download-all", methods=["GET"])
+def download_report_set_archive(report_id: str):
+    """Download all predefined reports as a ZIP archive."""
+    filename, base_df = _load_report_dataframe(report_id)
+    archive_buffer = BytesIO()
+    with zipfile.ZipFile(archive_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for report_key, (_, build_dataframe) in get_report_set_reports(base_df).items():
+            headers, rows = _dataframe_preview_table(build_dataframe(base_df))
+            archive.writestr(
+                _build_report_set_filename(filename, report_key),
+                _build_formatted_csv(headers, rows),
+            )
+    archive_buffer.seek(0)
+
+    return send_file(
+        archive_buffer,
+        as_attachment=True,
+        download_name=f"{_filename_stem(filename)}_reportset.zip",
+        mimetype="application/zip",
+    )
+
+
+def _render_report_preview(
+    *,
+    report_id: str,
+    filename: str,
+    headers: list[str],
+    rows: list[list[str]],
+    download_url: str,
+    back_url: str | None = None,
+    back_label: str = "Back to Queue",
+    subtitle: str | None = None,
+):
+    """Render the shared preview table template for a base or derived report."""
     date_separator_index = headers.index("date") if "date" in headers else None
     pv_growth_end_separator_index = (
         headers.index("pv_growth_enquery_count_date_p2_vs_t_avg")
@@ -261,6 +363,10 @@ def view_report_table(report_id: str):
         pv_growth_end_separator_index=pv_growth_end_separator_index,
         rows=rows,
         row_count=len(rows),
+        download_url=download_url,
+        back_url=back_url or url_for("home.report_generator_page"),
+        back_label=back_label,
+        subtitle=subtitle,
     )
 
 
@@ -290,9 +396,11 @@ def report_status():
         if isinstance(report_id, str) and status == "Completed":
             row["download_url"] = url_for("home.download_report", report_id=report_id)
             row["view_url"] = url_for("home.view_report_table", report_id=report_id)
+            row["reportset_url"] = url_for("home.view_report_set", report_id=report_id)
         else:
             row["download_url"] = None
             row["view_url"] = None
+            row["reportset_url"] = None
         payload.append(row)
 
     return jsonify({"reports": payload})
@@ -304,6 +412,54 @@ def _get_report_job_manager():
     if manager is None:
         raise RuntimeError("report_job_manager is not initialized.")
     return manager
+
+
+def _load_report_dataframe(report_id: str) -> tuple[str, pd.DataFrame]:
+    """Load a completed base report as a DataFrame before display formatting."""
+    download_file = _get_report_job_manager().get_download_file(report_id)
+    if download_file is None:
+        abort(404)
+    filename, csv_content = download_file
+    return filename, load_base_report_dataframe(csv_content)
+
+
+def _load_report_set_item(report_id: str) -> tuple[str, pd.DataFrame, str, str]:
+    """Build the named report from the base DataFrame, or return 404."""
+    report_key = request.args.get("report", "")
+    filename, base_df = _load_report_dataframe(report_id)
+    reports = get_report_set_reports(base_df)
+    if report_key not in reports:
+        abort(404)
+    label, build_dataframe = reports[report_key]
+    return filename, build_dataframe(base_df), report_key, label
+
+
+def _dataframe_preview_table(report_df: pd.DataFrame) -> tuple[list[str], list[list[str]]]:
+    """Apply existing display rules only after the report's DataFrame is built."""
+    return _parse_csv_content(report_df.to_csv(index=False).encode("utf-8"))
+
+
+def _build_formatted_csv(headers: list[str], rows: list[list[str]]) -> bytes:
+    """Build CSV bytes with the same grouped headers shown in the preview table."""
+    grouped_headers_result = _build_grouped_headers(headers)
+    return _build_preview_csv_content(
+        headers,
+        rows,
+        grouped_headers_result.top_headers,
+        grouped_headers_result.middle_headers,
+        grouped_headers_result.detail_headers,
+    )
+
+
+def _filename_stem(filename: str) -> str:
+    """Return filename without a trailing .csv extension."""
+    stripped = filename.strip() or "report.csv"
+    return stripped[:-4] if stripped.lower().endswith(".csv") else stripped
+
+
+def _build_report_set_filename(filename: str, report_key: str) -> str:
+    """Return the formatted CSV filename for one report set item."""
+    return f"{_filename_stem(filename)}_{report_key.replace('-', '_')}_formatted.csv"
 
 
 def _parse_csv_content(csv_content: bytes) -> tuple[list[str], list[list[str]]]:

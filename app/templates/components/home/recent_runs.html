@@ -16,6 +16,7 @@
         <span class="badge {{ report.status | lower }}">{{ report.status }}</span>
         {% if report.status == "Completed" and report.report_id %}
         <a class="view-link" href="{{ url_for('home.view_report_table', report_id=report.report_id) }}">View Report</a>
+        <a class="view-link" href="{{ url_for('home.view_report_set', report_id=report.report_id) }}">ReportSet</a>
         {% endif %}
       </div>
     </li>

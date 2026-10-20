@@ -288,7 +288,7 @@ button:hover {
 }
 
 .job-row {
-  grid-template-columns: minmax(68px, 0.65fr) minmax(180px, 1.4fr) minmax(120px, 1fr) auto auto auto;
+  grid-template-columns: minmax(68px, 0.65fr) minmax(180px, 1.4fr) minmax(120px, 1fr) auto auto auto auto;
   align-items: center;
   column-gap: 8px;
 }

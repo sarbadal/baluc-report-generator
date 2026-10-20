@@ -12,12 +12,14 @@
     <div class="preview-header">
       <div>
         <h1>CSV Preview</h1>
+        {% if subtitle %}<p class="meta meta-strong">{{ subtitle }}</p>{% endif %}
         <p class="meta">Report ID: {{ report_id }}</p>
         <p class="meta">File: {{ filename }}</p>
       </div>
       <div class="actions">
-        <a class="btn" href="{{ url_for('home.report_generator_page') }}">Back to Queue</a>
-        <a class="btn btn-primary" href="{{ url_for('home.download_formatted_report', report_id=report_id) }}">Download CSV</a>
+        <a class="btn" href="{{ back_url }}">{{ back_label }}</a>
+        <a class="btn" href="{{ url_for('home.view_report_set', report_id=report_id) }}">Report Set</a>
+        <a class="btn btn-primary" href="{{ download_url }}">Download CSV</a>
       </div>
     </div>
 

@@ -23,6 +23,29 @@ Flask-based report workspace for generating and downloading report files, with G
 
 ## Run Locally
 
+### Customizing ReportSet reports
+
+Each completed base report has **Brand wise Enquery** plus one **By Caption:
+caption name** entry for every distinct caption, with individual previews, CSV
+downloads, and a combined ZIP download. Blank captions get a `(blank)` entry.
+Caption reports contain only rows matching that exact caption. They are generated
+on demand, not stored as separate GCS objects. Brand wise Enquery retains its
+custom `bu == "--"` filter.
+
+Edit `brand_wise_enquery(base_df)` or `by_caption(base_df, caption=...)` in
+[app/report_factory/report_set.py](app/report_factory/report_set.py) to customize
+each report independently. Each function receives a pandas DataFrame loaded from
+the original CSV, before display header renaming or percentage formatting, and
+returns its own copy as `report_df`. Apply transformations to that copy and return
+the resulting DataFrame; preview, CSV, ZIP, and row counts all use these functions.
+`REPORT_SET_REPORTS` holds fixed reports; `get_report_set_reports(base_df)` adds
+the caption reports dynamically. Caption-specific keys are stable and unique,
+including captions with punctuation or non-ASCII characters.
+Numeric columns are inferred by pandas (caption is kept as text), while blank cells and literal strings
+such as `NA` are retained rather than converted to missing values.
+
+### Setup
+
 1. Create and activate a virtual environment.
 2. Install dependencies.
 3. Set environment variables in a local env file.

@@ -56,6 +56,7 @@
     const statusClass = esc(String(report.status || "").toLowerCase());
     const actions = report.download_url && report.view_url
       ? '<a class="view-report" href="' + esc(report.view_url) + '">View Report</a>' +
+        (report.reportset_url ? '<a class="view-report" href="' + esc(report.reportset_url) + '">ReportSet</a>' : "") +
         '<a class="download" href="' + esc(report.download_url) + '">CSV</a>'
       : '<span class="job-meta dash">-</span>';
     const error = report.error ? '<p class="job-error">' + esc(report.error) + "</p>" : "";

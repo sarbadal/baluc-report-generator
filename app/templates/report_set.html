@@ -1,0 +1,57 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Report Set | BaluC{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ static_asset('css/report_preview.css') }}" />
+{% endblock %}
+
+{% block body %}
+<main class="preview-page">
+  <section class="preview-content">
+    <div class="preview-header">
+      <div>
+        <h1>Report Set</h1>
+        <p class="meta">Report ID: {{ report_id }}</p>
+        <p class="meta">Base file: {{ filename }}</p>
+      </div>
+      <div class="actions">
+        <a class="btn" href="{{ url_for('home.report_generator_page') }}">Back to Queue</a>
+        <a class="btn" href="{{ url_for('home.view_report_table', report_id=report_id) }}">View Base Report</a>
+        <a class="btn btn-primary" href="{{ url_for('home.download_report_set_archive', report_id=report_id) }}">Download All (ZIP)</a>
+      </div>
+    </div>
+
+    <p class="summary">
+      {{ report_set_items|length }} reports from {{ total_row_count }} base rows
+    </p>
+
+    <p class="meta">Predefined reports based on this report's data.</p>
+    <div class="table-wrap reportset-table-wrap{% if report_set_items|length > 15 %} is-scrollable{% endif %}">
+      <table class="reportset-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Report Name</th>
+            <th>Rows</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in report_set_items %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ item.label }}</td>
+            <td>{{ item.row_count }}</td>
+            <td class="reportset-actions">
+              <a class="btn" href="{{ item.view_url }}">View</a>
+              <a class="btn btn-primary" href="{{ item.download_url }}">CSV</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+{% endblock %}
