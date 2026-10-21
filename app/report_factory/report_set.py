@@ -18,6 +18,12 @@ METRIC_COLUMNS = {
     prefix: tuple(f"{prefix}_enquery_count_date_{period}" for period in ENQUIRY_PERIODS)
     for prefix in METRIC_PREFIXES
 }
+PERFORMANCE_PERIODS = {
+    "m2_m1": ("m2", "m1"),
+    "t": ("t", "t"),
+    "p2_p1": ("p2", "p1"),
+}
+GROWTH_COMPARISONS = {"t_vs_m2": ("t", "m2_m1"), "p2_vs_t": ("p2_p1", "t")}
 WINDOW_OFFSETS = {
     "tm2": {"m2": -1, "t": -2, "p1": -3, "p2": -4},
     "tm1": {"t": -1, "p1": -2},
@@ -65,7 +71,7 @@ def _calculate_window_sum(df: pd.DataFrame, parameters: DedupParameters, window_
 
 def calculate_window_date_state_sum(df: pd.DataFrame, parameters: DedupParameters, window_offsets: dict[str, int]) -> int:
     """Sum metrics on matching dates and state."""
-    return _calculate_window_sum(df, parameters, window_offsets, include_ppl=False)
+    return _calculate_window_sum(df, parameters, window_offsets)
 
 
 def calculate_window_date_state_caption_sum(df: pd.DataFrame, parameters: DedupParameters, window_offsets: dict[str, int]) -> int:
@@ -76,6 +82,31 @@ def calculate_window_date_state_caption_sum(df: pd.DataFrame, parameters: DedupP
 def calculate_window_date_state_ppl_sum(df: pd.DataFrame, parameters: DedupParameters, window_offsets: dict[str, int]) -> int:
     """Sum metrics on matching dates, state, and ppl."""
     return _calculate_window_sum(df, parameters, window_offsets, include_ppl=True)
+
+
+def _add_performance_metrics(df: pd.DataFrame) -> pd.DataFrame:
+    """Add performance averages and growth percentages for each metric family."""
+    for prefix in METRIC_PREFIXES:
+        averages: dict[str, pd.Series] = {}
+        for period_name, periods in PERFORMANCE_PERIODS.items():
+            average_column = f"{prefix}_perf_enquery_count_date_{period_name}_avg"
+            source_columns = [f"{prefix}_enquery_count_date_{period}" for period in periods]
+            df[average_column] = df[source_columns].mean(axis=1)
+            averages[period_name] = df[average_column]
+
+        for comparison, (numerator, denominator) in GROWTH_COMPARISONS.items():
+            growth_column = f"{prefix}_growth_enquery_count_date_{comparison}_avg"
+            df[growth_column] = (averages[numerator] / averages[denominator] - 1) * 100
+    return df
+
+
+def _has_report_columns(df: pd.DataFrame, *, include_metrics: bool = True) -> bool:
+    required_columns = set(IDENTITY_COLUMNS)
+    if include_metrics:
+        required_columns.update(
+            column for columns in METRIC_COLUMNS.values() for column in columns
+        )
+    return required_columns.issubset(df.columns)
 
 
 def load_base_report_dataframe(csv_content: bytes) -> pd.DataFrame:
@@ -125,9 +156,12 @@ def brand_wise_enquery(base_df: pd.DataFrame) -> pd.DataFrame:
             ),
         )
 
+    result = _add_performance_metrics(result)
+
     for column in COLUMNS:
         if column not in result:
             result[column] = pd.NA
+
     return result.loc[:, COLUMNS].copy()
 
 
@@ -185,29 +219,33 @@ def _deduplicate_metric_family(
 
 def caption_report(base_df: pd.DataFrame) -> pd.DataFrame:
     """Generate a caption-specific report."""
+    if not _has_report_columns(base_df):
+        return base_df.copy(deep=True)
+
     report_df = base_df.copy(deep=True)
 
     for prefix in METRIC_PREFIXES:
         report_df = _deduplicate_metric_family(
             report_df,
             prefix,
-            window_sum_calculator=(
-                calculate_window_date_state_ppl_sum
-                if prefix == "evc"
-                else calculate_window_date_state_ppl_sum
-            ),
+            window_sum_calculator=calculate_window_date_state_ppl_sum,
         )
 
-    for column in COLUMNS:
-        if column not in report_df:
-            report_df[column] = pd.NA
+    result = _add_performance_metrics(report_df)
 
-    return report_df.loc[:, COLUMNS].copy()
+    for column in COLUMNS:
+        if column not in result:
+            result[column] = pd.NA
+
+    return result.loc[:, COLUMNS].copy()
 
 
 def by_caption(base_df: pd.DataFrame, *, caption: str) -> pd.DataFrame:
     """Customize one caption's report without modifying the base DataFrame."""
     report_df = base_df.loc[base_df["caption"] == caption].copy(deep=True)
+    if not _has_report_columns(base_df) or "bu" not in base_df:
+        return report_df
+
     left = report_df.loc[report_df["bu"] == "--"].copy()
     left = left.loc[:, ["bu", "caption", "ppl", "state", "pub_name", "date" ]]
     left = left.sort_values(by=["bu", "caption", "ppl", "state", "pub_name", "date"]).drop_duplicates()
