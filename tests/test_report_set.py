@@ -10,6 +10,7 @@ from flask import Flask
 
 from app.blueprints.auth import auth_blueprint
 from app.blueprints.home import home_blueprint
+from app.blueprints.home import _build_report_set_filenames
 from app.report_factory.report_set import REPORT_SET_REPORTS
 from app.report_factory.report_set import by_caption
 from app.report_factory.report_set import get_report_set_reports
@@ -122,7 +123,12 @@ def test_report_set_item_view_and_download_use_builder_data(report_key: str, lab
 
     download = client.get(f"/reports/r1/reportset/download?report={report_key}")
     assert download.status_code == 200
-    assert f"_{report_key.replace('-', '_')}_formatted.csv" in download.headers["Content-Disposition"]
+    name = (
+        "brand_enquiry" if report_key == "brand-wise-enquery"
+        else f"caption_{label.removeprefix('By Caption: ').lower()}"
+    ) + "_20260701_20260702.csv"
+    assert f"filename={name}" in download.headers["Content-Disposition"]
+    assert name in view_body
     from app.blueprints.home import _build_formatted_csv, _dataframe_preview_table
     assert download.data == _build_formatted_csv(*_dataframe_preview_table(expected_df))
     assert client.get("/reports/r1/download").data == BASE_CSV
@@ -136,10 +142,18 @@ def test_report_set_download_all_returns_zip_of_items() -> None:
     assert response.mimetype == "application/zip"
     with zipfile.ZipFile(BytesIO(response.data)) as archive:
         reports = get_report_set_reports(load_base_report_dataframe(BASE_CSV))
-        assert len(archive.namelist()) == 4
-        for report_key in reports:
+        assert set(archive.namelist()) == {
+            "brand_enquiry_20260701_20260702.csv",
+            "caption_altroz_20260701_20260702.csv",
+            "caption_curvv_20260701_20260702.csv",
+            "caption_nexon_20260701_20260702.csv",
+        }
+        for report_key, (label, _) in reports.items():
             download = client.get(f"/reports/r1/reportset/download?report={report_key}")
-            name = f"ev_20260701_20260702_r1_{report_key.replace('-', '_')}_formatted.csv"
+            name = (
+                "brand_enquiry" if report_key == "brand-wise-enquery"
+                else f"caption_{label.removeprefix('By Caption: ').lower()}"
+            ) + "_20260701_20260702.csv"
             assert archive.read(name) == download.data
 
 
@@ -172,7 +186,68 @@ def test_custom_dataframe_is_used_by_page_preview_download_and_zip(monkeypatch) 
     assert download.data == b"caption,state\r\nAltroz,Kerala\r\n"
     archive_response = client.get("/reports/r1/reportset/download-all")
     with zipfile.ZipFile(BytesIO(archive_response.data)) as archive:
-        assert archive.read("ev_20260701_20260702_r1_brand_wise_enquery_formatted.csv") == download.data
+        assert archive.read("brand_enquiry_20260701_20260702.csv") == download.data
+
+
+def test_report_set_filenames_are_short_safe_unique_and_stable() -> None:
+    captions = ["A/B", "A B", "a_b", "a_b_2", "", "(blank)", "日本語", "../", "X" * 200, "X" * 201]
+    reports = get_report_set_reports(pd.DataFrame({"caption": captions}))
+    labels = {key: label for key, (label, _) in reports.items()}
+    filenames = _build_report_set_filenames(
+        "ev_20260701_20260702_long_internal_report_id.csv", labels
+    )
+    assert filenames == _build_report_set_filenames(
+        "ev_20260701_20260702_long_internal_report_id.csv",
+        dict(reversed(list(labels.items()))),
+    )
+    names = list(filenames.values())
+    assert len({name.casefold() for name in names}) == len(reports)
+    assert "caption_日本語_20260701_20260702.csv" in names
+    assert "caption_blank_20260701_20260702.csv" in names
+    for name in names:
+        assert len(name) <= 72
+        assert name.endswith("_20260701_20260702.csv")
+        assert not any(character in name for character in ("/", "\\", ".."))
+        assert "formatted" not in name
+
+
+def test_report_set_filenames_without_date_range_do_not_invent_dates() -> None:
+    assert _build_report_set_filenames(
+        "empty.csv", {"brand-wise-enquery": "Brand wise Enquery"}
+    ) == {"brand-wise-enquery": "brand_enquiry.csv"}
+
+
+def test_report_set_zip_handles_colliding_and_unicode_captions(monkeypatch) -> None:
+    base_df = pd.DataFrame({
+        "bu": ["PV"] * 5,
+        "caption": ["A/B", "A B", "", "日本語", "X" * 200],
+    })
+    monkeypatch.setattr(
+        _FakeReportJobManager,
+        "get_download_file",
+        lambda self, report_id: (
+            "ev_20260701_20260702_r1.csv", base_df.to_csv(index=False).encode("utf-8")
+        ),
+    )
+    client = _make_client()
+    reports = get_report_set_reports(base_df)
+    filenames = _build_report_set_filenames(
+        "ev_20260701_20260702_r1.csv",
+        {key: label for key, (label, _) in reports.items()},
+    )
+    response = client.get("/reports/r1/reportset/download-all")
+    assert response.status_code == 200
+    with zipfile.ZipFile(BytesIO(response.data)) as archive:
+        assert len(set(archive.namelist())) == len(reports)
+        for report_key, name in filenames.items():
+            download = client.get(f"/reports/r1/reportset/download?report={report_key}")
+            assert download.status_code == 200
+            assert archive.read(name) == download.data
+            if name.isascii():
+                assert f"filename={name}" in download.headers["Content-Disposition"]
+            else:
+                from urllib.parse import quote
+                assert f"filename*=UTF-8''{quote(name)}" in download.headers["Content-Disposition"]
 
 
 def test_empty_base_report_keeps_predefined_reports_available(monkeypatch) -> None:

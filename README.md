@@ -32,6 +32,13 @@ Caption reports contain only rows matching that exact caption. They are generate
 on demand, not stored as separate GCS objects. Brand wise Enquery retains its
 custom `bu == "--"` filter.
 
+Report Set CSV downloads use short names with the source date range, such as
+`brand_enquiry_20260701_20260702.csv` and `caption_altroz_20260701_20260702.csv`.
+Individual downloads and ZIP entries use the same names, without internal report
+IDs or caption hashes. Names are filesystem-safe, long captions are shortened,
+and duplicate names receive numeric suffixes. The date suffix is omitted when the
+source filename does not contain a `YYYYMMDD_YYYYMMDD` range.
+
 Edit `brand_wise_enquery(base_df)` or `by_caption(base_df, caption=...)` in
 [app/report_factory/report_set.py](app/report_factory/report_set.py) to customize
 each report independently. Each function receives a pandas DataFrame loaded from

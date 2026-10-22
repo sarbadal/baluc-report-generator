@@ -9,6 +9,7 @@ from datetime import date
 from io import BytesIO
 from io import StringIO
 import os
+import re
 from typing import TypedDict
 import zipfile
 from zoneinfo import ZoneInfo
@@ -281,7 +282,7 @@ def view_report_set_item(report_id: str):
     headers, rows = _dataframe_preview_table(report_df)
     return _render_report_preview(
         report_id=report_id,
-        filename=_build_report_set_filename(filename, report_key),
+        filename=filename,
         headers=headers,
         rows=rows,
         download_url=url_for(
@@ -301,7 +302,7 @@ def download_report_set_item(report_id: str):
     return send_file(
         BytesIO(_build_formatted_csv(headers, rows)),
         as_attachment=True,
-        download_name=_build_report_set_filename(filename, report_key),
+        download_name=filename,
         mimetype="text/csv",
     )
 
@@ -310,12 +311,16 @@ def download_report_set_item(report_id: str):
 def download_report_set_archive(report_id: str):
     """Download all predefined reports as a ZIP archive."""
     filename, base_df = _load_report_dataframe(report_id)
+    reports = get_report_set_reports(base_df)
+    filenames = _build_report_set_filenames(
+        filename, {key: label for key, (label, _) in reports.items()}
+    )
     archive_buffer = BytesIO()
     with zipfile.ZipFile(archive_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for report_key, (_, build_dataframe) in get_report_set_reports(base_df).items():
+        for report_key, (_, build_dataframe) in reports.items():
             headers, rows = _dataframe_preview_table(build_dataframe(base_df))
             archive.writestr(
-                _build_report_set_filename(filename, report_key),
+                filenames[report_key],
                 _build_formatted_csv(headers, rows),
             )
     archive_buffer.seek(0)
@@ -431,7 +436,10 @@ def _load_report_set_item(report_id: str) -> tuple[str, pd.DataFrame, str, str]:
     if report_key not in reports:
         abort(404)
     label, build_dataframe = reports[report_key]
-    return filename, build_dataframe(base_df), report_key, label
+    filenames = _build_report_set_filenames(
+        filename, {key: label for key, (label, _) in reports.items()}
+    )
+    return filenames[report_key], build_dataframe(base_df), report_key, label
 
 
 def _dataframe_preview_table(report_df: pd.DataFrame) -> tuple[list[str], list[list[str]]]:
@@ -457,9 +465,30 @@ def _filename_stem(filename: str) -> str:
     return stripped[:-4] if stripped.lower().endswith(".csv") else stripped
 
 
-def _build_report_set_filename(filename: str, report_key: str) -> str:
-    """Return the formatted CSV filename for one report set item."""
-    return f"{_filename_stem(filename)}_{report_key.replace('-', '_')}_formatted.csv"
+def _build_report_set_filenames(filename: str, labels: dict[str, str]) -> dict[str, str]:
+    """Build short, filesystem-safe names shared by previews, CSVs and ZIPs."""
+    date_match = re.search(r"(?<!\d)(\d{8}_\d{8})(?!\d)", _filename_stem(filename))
+    date_suffix = f"_{date_match[1]}" if date_match else ""
+    filenames: dict[str, str] = {}
+    used_names: set[str] = set()
+    for report_key, label in sorted(labels.items()):
+        if report_key == "brand-wise-enquery":
+            stem = "brand_enquiry"
+        elif report_key.startswith("by-caption-"):
+            caption = label.removeprefix("By Caption: ")
+            caption_name = re.sub(r"[^\w]+", "_", caption.lower()).strip("_")
+            stem = f"caption_{caption_name}" if caption_name else "caption"
+        else:
+            stem = re.sub(r"[^\w]+", "_", label.lower()).strip("_") or "report"
+        stem = stem[:48].rstrip("._")
+        candidate = f"{stem}{date_suffix}.csv"
+        number = 2
+        while candidate.casefold() in used_names:
+            candidate = f"{stem}_{number}{date_suffix}.csv"
+            number += 1
+        filenames[report_key] = candidate
+        used_names.add(candidate.casefold())
+    return filenames
 
 
 def _parse_csv_content(csv_content: bytes) -> tuple[list[str], list[list[str]]]:
