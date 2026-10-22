@@ -27,7 +27,8 @@ Flask-based report workspace for generating and downloading report files, with G
 
 Each completed base report has **Brand wise Enquery** plus one **By Caption:
 caption name** entry for every distinct caption, with individual previews, CSV
-downloads, and a combined ZIP download. Blank captions get a `(blank)` entry.
+downloads, and a combined ZIP download. The aggregate caption `All` is excluded
+from the Report Set; its base data is unchanged. Blank captions get a `(blank)` entry.
 Caption reports contain only rows matching that exact caption. They are generated
 on demand, not stored as separate GCS objects. Brand wise Enquery retains its
 custom `bu == "--"` filter.

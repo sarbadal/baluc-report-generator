@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
 import zipfile
@@ -293,6 +294,36 @@ def test_caption_registry_preserves_exact_values_and_stable_unique_keys() -> Non
     assert any(label == "By Caption: (blank)" for label, _ in reports.values())
     numeric_caption = load_base_report_dataframe(b"bu,caption\nPV,001\n")
     assert numeric_caption.loc[0, "caption"] == "001"
+
+
+def test_all_caption_is_excluded_from_report_set_surfaces(monkeypatch) -> None:
+    csv_content = BASE_CSV + b"All,All,Kerala,Ajit,AJIT,2026-07-01,13\n"
+    base_df = load_base_report_dataframe(csv_content)
+    original_df = base_df.copy(deep=True)
+    reports = get_report_set_reports(base_df)
+    assert len(reports) == 4
+    assert all(label != "By Caption: All" for label, _ in reports.values())
+    pd.testing.assert_frame_equal(base_df, original_df)
+    monkeypatch.setattr(
+        _FakeReportJobManager,
+        "get_download_file",
+        lambda self, report_id: ("ev_20260701_20260702_r1.csv", csv_content),
+    )
+    client = _make_client()
+    page = client.get("/reports/r1/reportset").get_data(as_text=True)
+    assert "4 reports from 5 base rows" in page
+    assert "By Caption: All" not in page
+    assert "By Caption: Altroz" in page
+    all_key = f"by-caption-{sha256(b'All').hexdigest()}"
+    for action in ("view", "download"):
+        assert client.get(f"/reports/r1/reportset/{action}?report={all_key}").status_code == 404
+    response = client.get("/reports/r1/reportset/download-all")
+    assert response.status_code == 200
+    with zipfile.ZipFile(BytesIO(response.data)) as archive:
+        assert len(archive.namelist()) == 4
+        assert "caption_all_20260701_20260702.csv" not in archive.namelist()
+        assert "brand_enquiry_20260701_20260702.csv" in archive.namelist()
+    assert client.get("/reports/r1/download").data == csv_content
 
 
 def test_missing_caption_column_is_an_explicit_error() -> None:

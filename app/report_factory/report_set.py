@@ -275,6 +275,8 @@ def get_report_set_reports(base_df: pd.DataFrame) -> dict[str, tuple[str, Callab
     if "caption" not in base_df.columns:
         raise ValueError("The base report must contain a 'caption' column.")
     for caption in sorted(base_df["caption"].unique(), key=lambda value: (value.casefold(), value)):
+        if caption == "All":
+            continue
         caption_key = sha256(caption.encode("utf-8")).hexdigest()
         reports[f"by-caption-{caption_key}"] = (
             f"By Caption: {caption or '(blank)'}",
